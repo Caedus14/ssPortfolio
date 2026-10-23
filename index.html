@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="Application developer building custom C# / .NET business applications, REST APIs, and Azure integrations. Based in Eau Claire, WI."
+    />
+    <meta name="author" content="Seth Stearns" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#f3f6f5" />
+
+    <meta property="og:title" content="Seth Stearns · Application Developer" />
+    <meta
+      property="og:description"
+      content="Application developer building custom C# / .NET business applications, REST APIs, and Azure integrations. Based in Eau Claire, WI."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="en_US" />
+    <!-- Root-relative until VITE_SITE_URL is known. Social crawlers need an absolute URL; see the README. -->
+    <meta property="og:image" content="/og.png" />
+    <meta property="og:image:alt" content="Seth Stearns, Application Developer" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Seth Stearns · Application Developer" />
+    <meta
+      name="twitter:description"
+      content="Application developer building custom C# / .NET business applications, REST APIs, and Azure integrations. Based in Eau Claire, WI."
+    />
+    <meta name="twitter:image" content="/og.png" />
+    <meta name="twitter:image:alt" content="Seth Stearns, Application Developer" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <title>Seth Stearns · Application Developer</title>
+
+    <!--
+      Runs before the bundle so the first paint uses the saved theme.
+      A module import would be too late and the page would flash.
+      Keep this in sync with src/theme/storage.ts (key "theme").
+    -->
+    <script>
+      (function () {
+        var key = 'theme';
+        var preference = 'system';
+        try {
+          var stored = localStorage.getItem(key);
+          if (stored === 'light' || stored === 'dark') preference = stored;
+        } catch (error) {
+          /* Storage can throw in private mode. The OS setting still works. */
+        }
+        var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme =
+          preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+        var root = document.documentElement;
+        root.setAttribute('data-theme', theme);
+        root.setAttribute('data-theme-preference', preference);
+        root.style.colorScheme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
