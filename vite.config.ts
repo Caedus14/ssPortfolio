@@ -35,9 +35,6 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       css: false,
-      // Removed once src/test has real cases. Kept only so an early
-      // toolchain commit can run `npm test` before those files exist.
-      passWithNoTests: true,
     },
   };
 });
