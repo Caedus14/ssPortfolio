@@ -75,6 +75,12 @@ export const sections: readonly SectionNavItem[] = [
 
 export const sectionIds: readonly string[] = sections.map((section) => section.id);
 
+export function sectionById(id: string): SectionNavItem {
+  const section = sections.find((item) => item.id === id);
+  if (!section) throw new Error(`Unknown section "${id}". Check src/data/content.ts.`);
+  return section;
+}
+
 export const experience: readonly ExperienceEntry[] = [
   {
     id: 'baker-tilly',
