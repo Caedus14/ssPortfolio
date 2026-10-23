@@ -22,8 +22,9 @@ export function Section({
       id={id}
       aria-labelledby={headingId}
       className={cn(
-        // Clears the sticky mobile header when a nav link jumps here.
-        'scroll-mt-32',
+        // Mobile: clear the sticky header. Desktop: a short offset, because
+        // the header sits beside the content instead of on top of it.
+        'scroll-mt-28 lg:scroll-mt-8',
         spacing === 'default' ? 'py-12 sm:py-16' : 'pt-0 pb-12 sm:pb-16',
       )}
     >

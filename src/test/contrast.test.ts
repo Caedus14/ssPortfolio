@@ -68,6 +68,13 @@ const noJsDark = varsIn(
   sliceBetween(css, ":root:not([data-theme='light'])", '@theme inline'),
 );
 
+describe('mobile menu', () => {
+  it('overrides the browser dialog inset so the panel docks to the right', () => {
+    expect(css).toContain('#mobile-menu:modal');
+    expect(css).toMatch(/#mobile-menu:modal\s*\{[\s\S]*?left:\s*auto/);
+  });
+});
+
 describe('color tokens', () => {
   it('uses the same dark palette when JavaScript has not run', () => {
     expect(noJsDark).toEqual(dark);
