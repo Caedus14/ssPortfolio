@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#0b1220"/>
+  <rect width="16" height="630" fill="#8aeadc"/>
+  <text x="88" y="250" fill="#e7eef6" font-family="Noto Serif, Georgia, serif" font-size="84">Seth Stearns</text>
+  <text x="88" y="330" fill="#8aeadc" font-family="Inter, sans-serif" font-size="36">Application Developer</text>
+  <text x="88" y="400" fill="#b7c5d4" font-family="Inter, sans-serif" font-size="28">C# / .NET  ·  Azure  ·  APIs &amp; Integrations</text>
+  <text x="88" y="530" fill="#b7c5d4" font-family="Inter, sans-serif" font-size="24">Eau Claire, WI</text>
+</svg>

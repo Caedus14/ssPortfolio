@@ -1,1 +1,200 @@
-# ssPortfolio
+# Seth Stearns — portfolio
+
+Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. Phase 1 is a static site: the words live in one typed file, and the pages are generated at build time. There is no server and no database in this version.
+
+Later phases can sit beside this without a rewrite:
+
+- **Phase 2** adds an ASP.NET Core contact API and Azure SQL. The switch for that is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
+- **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
+
+The repository is public. There is no license file, by choice. See [Rights](#rights).
+
+## Tech stack
+
+| Piece                                                                           | Role                                                                                                                  |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [React 19](https://react.dev/)                                                  | UI components.                                                                                                        |
+| [TypeScript](https://www.typescriptlang.org/) (strict)                          | Types for content and components, so a typo in the resume data fails the build.                                       |
+| [Vite](https://vite.dev/)                                                       | Dev server and production bundler. `npm run dev` reloads as you edit. `npm run build` writes static files to `dist/`. |
+| [Tailwind CSS 4](https://tailwindcss.com/)                                      | Utility classes for layout and spacing. Colors are CSS variables, so light and dark share one set of class names.     |
+| [Framer Motion](https://www.framer.com/motion/)                                 | Short entrance motion on sections. It is skipped when the visitor asks for reduced motion.                            |
+| [React Router](https://reactrouter.com/)                                        | Home page, `/projects/:slug` detail pages, and a not-found page.                                                      |
+| [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) | Tests that render the page the way a visitor would: click a filter, toggle the theme, read the text.                  |
+| ESLint + Prettier                                                               | Lint rules (including accessibility) and one formatting style.                                                        |
+| GitHub Actions                                                                  | On every push to `main` and every pull request: lint, format check, typecheck, test, and build.                       |
+
+Fonts (Outfit and Fraunces) are bundled from `@fontsource`, Latin subset only. The site does not call Google Fonts or an analytics service.
+
+## Folder structure
+
+```
+index.html                  Title, meta tags, and the theme script that runs before React
+public/                     Files copied into dist/ as-is
+  favicon.svg
+  apple-touch-icon.png
+  og.png                    Social preview image
+  robots.txt
+  site.webmanifest
+  staticwebapp.config.json  Azure Static Web Apps routing and headers
+  images/                   Decorative project covers (SVG)
+src/
+  main.tsx                  React entry
+  App.tsx                   Theme, router, and the two-column shell
+  index.css                 Color tokens, focus ring, reduced-motion rules
+  config/site.ts            Public site URL and phase feature flags
+  data/
+    types.ts                TypeScript shapes (Profile, Experience, Project, …)
+    content.ts              Every word on the site. Edit this, not the components.
+  theme/                    Light / dark preference and localStorage
+  hooks/                    Scroll-spy and per-page title
+  lib/                      Small pure functions (filter, contrast helpers, JSON-LD)
+  components/               Header, sections, cards, links
+  pages/                    Home, project detail, not found
+  test/                     Vitest tests
+.github/workflows/ci.yml
+```
+
+On a wide screen the header stays fixed on the left (name, title, section links, social links) and the sections scroll on the right. On a narrow screen the layout is one column and the section links move into a menu button.
+
+## Run it locally
+
+You need [Node.js 22](https://nodejs.org/) or newer.
+
+```bash
+npm ci          # install the exact versions in package-lock.json
+npm run dev     # http://localhost:5173
+```
+
+`npm ci` is the same command CI uses. The repo includes an `.npmrc` with `legacy-peer-deps=true` because npm 10's resolver crashes on this dependency tree (`Cannot read properties of null (reading 'edgesOut')`). The lockfile still pins versions.
+
+Other scripts:
+
+| Script                 | What it does                                   |
+| ---------------------- | ---------------------------------------------- |
+| `npm run dev`          | Vite dev server with hot reload.               |
+| `npm test`             | Run the test suite once.                       |
+| `npm run test:watch`   | Re-run tests as files change.                  |
+| `npm run lint`         | ESLint, zero warnings allowed.                 |
+| `npm run format`       | Prettier write.                                |
+| `npm run format:check` | Prettier check (CI uses this).                 |
+| `npm run typecheck`    | `tsc -b` with the strict app and Node configs. |
+| `npm run build`        | Typecheck, then write `dist/`.                 |
+| `npm run preview`      | Serve the production build locally.            |
+
+## How to edit content
+
+Open `src/data/content.ts`. The shapes are in `src/data/types.ts`. If a field is missing or the wrong type, `npm run typecheck` (and the dev server) will say so.
+
+A few rules that keep the page honest:
+
+- Facts come from the resume. Leave out employers, dates, metrics, and projects that are not already written down.
+- Public location is city and state (`Eau Claire, WI`). Leave the phone number, street, and ZIP off the site, including JSON-LD in `src/lib/jsonLd.ts`.
+- Experience `tech` tags should be tools that role's bullets already name.
+- `demoUrl` and `repoUrl` stay `null` until a real URL exists. The detail page then says that nothing public is listed.
+- Comments marked `PLACEHOLDER` are real work (the homelab, and this website) that is not a client case study. Keep that wording if you extend them.
+- The homelab status `live` means the lab is still running. It is a private network, so it has no demo link.
+- Project covers in `public/images/` are decorative drawings (`alt: ""`). When you add a real screenshot, set `alt` to a short description of what the picture shows, and add `loading="lazy"` is already applied by `ProjectCover`.
+
+### Add a skill
+
+Add a string to the right group in `skillGroups`. To add a group, append an object with a unique `id`, a `title`, and `items`.
+
+### Add a project
+
+Append an object to `projects`. `slug` becomes the URL (`/projects/your-slug`) and must be unique. `status` is `'live'`, `'in-progress'`, or `'archived'`. Tech tags on the home page are collected from every project's `tech` array, so a new tag shows up in the filter on its own.
+
+```ts
+{
+  slug: 'example',
+  title: 'Example',
+  summary: 'One or two sentences already supported by highlights.',
+  context: null,
+  highlights: ['A sentence you can stand behind.'],
+  status: 'in-progress',
+  tech: ['C#', 'ASP.NET'],
+  demoUrl: null,
+  repoUrl: null,
+  cover: null,
+}
+```
+
+The page title and the meta description are also in `content.ts` (`siteTitle`, `metaDescription`). The same strings are copied into `index.html` for the first paint and for crawlers that do not run JavaScript. If you change them, update both places. `src/test/meta.test.ts` fails when they drift apart.
+
+### Theme
+
+The first visit follows the operating system (`prefers-color-scheme`). Choosing light or dark writes `theme` to `localStorage` and sticks. Clearing that key returns to the system choice.
+
+`index.html` sets `data-theme` in a small inline script before the bundle loads, so the page does not flash the wrong colors. The storage key in that script must match `THEME_STORAGE_KEY` in `src/theme/storage.ts`. A test checks that.
+
+Colors live as CSS variables in `src/index.css`. Tailwind utilities such as `bg-canvas` and `text-ink` point at those variables, so components do not carry separate `dark:` color classes. `src/test/contrast.test.ts` checks the text pairs against WCAG AA (4.5:1) and checks that the no-JavaScript dark block matches the dark theme block.
+
+### Resume PDF
+
+The download button points at `/resume.pdf` and suggests the filename `Seth-Stearns-Resume.pdf`. The PDF is not in git. `public/resume.pdf` is listed in `.gitignore` because it is easy to export a file that still contains a phone number or a street address.
+
+To enable the download on your machine:
+
+1. Export a PDF that contains city and state only.
+2. Save it as `public/resume.pdf`.
+3. Deploy that file with the site (Azure will serve it). Leave it out of commits.
+
+Until that file exists, the button is a normal link and the browser will 404. That is expected in this repository.
+
+## Deploy to Azure Static Web Apps
+
+This phase does not include a deploy workflow. The GitHub Actions file only checks the code. A deploy needs a Static Web Apps deployment token, which should stay in GitHub secrets.
+
+In the Azure portal (or the Static Web Apps GitHub workflow Azure generates), use:
+
+| Setting         | Value                     |
+| --------------- | ------------------------- |
+| App location    | `/`                       |
+| Output location | `dist`                    |
+| API location    | leave empty until Phase 2 |
+
+`public/staticwebapp.config.json` is copied into `dist/` by Vite. It does three jobs:
+
+- Sends unknown paths (such as `/projects/homelab`) to `index.html` so React Router can render them. Files that exist on disk, including `*.pdf` and `/resume.pdf`, are excluded and served directly.
+- Sets basic response headers: `nosniff`, a strict referrer policy, `X-Frame-Options: DENY`, and a permissions policy that turns the camera, microphone, and geolocation off.
+- Declares MIME types for `.webmanifest` and `.pdf`.
+
+Set `VITE_SITE_URL` in the Azure build environment once you have a hostname, with no trailing slash:
+
+```bash
+VITE_SITE_URL=https://your-app.azurestaticapps.net
+```
+
+The Vite plugin in `vite.config.ts` then writes the canonical link, `og:url`, and an absolute `og:image`. A value that is not an `http` or `https` origin is ignored, and the image stays root-relative (`/og.png`). Copy `.env.example` to `.env` for local builds. `.env` is gitignored.
+
+`VITE_CONTACT_API_URL` is reserved for Phase 2. It is unused while `features.contactApi` is `false`.
+
+One tradeoff of the SPA fallback: a path that does not match a project still returns HTTP 200 with the "Page not found" screen. Azure is serving `index.html` on purpose so client-side routes work. A true 404 status would need a Static Web Apps function or a route rule per project slug.
+
+A Content-Security-Policy header is not set. The theme script in `index.html` is inline, and a strict policy would block it unless the policy includes a hash of that script. Add the hash in the same change that adds the policy.
+
+## Accessibility
+
+- Landmarks: skip link, `header`, `nav` ("Sections"), `main`, `footer`.
+- One `h1` per page (the name on the home page, the project title on a detail page).
+- Visible `:focus-visible` outline. Icon buttons are at least 44px.
+- External links open in a new tab with `rel="noreferrer noopener"` and a screen-reader note.
+- `prefers-reduced-motion` disables the Framer Motion offset and shortens CSS transitions. Section text stays fully opaque so it is not invisible while it animates.
+- Cover images use `alt=""` while they are decorative, and `loading="lazy"`.
+
+## Tests
+
+`src/test/` covers the behavior that is easy to break while editing content or theme code:
+
+- Project filter shows and hides cards, and the pressed state follows the selected tag.
+- Theme toggle writes `localStorage` and follows the system preference until a choice is saved.
+- Home page includes resume facts, landmarks, and the `/resume.pdf` link.
+- Rendered text and the content module contain no phone number, street, or ZIP.
+- Contrast tokens meet WCAG AA, and `index.html` matches `content.ts`.
+
+Tests render with `css: false`, so Tailwind's `hidden` / `lg:block` do not remove elements in jsdom. Both the mobile and desktop controls are in the document. Queries that can match twice (the theme button, LinkedIn) use `getAllByRole`.
+
+## Rights
+
+The source code is public so it can be read and deployed. No license is granted. All rights reserved.
+
+The resume wording, employment history, and other personal content belong to Seth Stearns. Copying the code does not include permission to reuse that content.

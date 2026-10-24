@@ -1,0 +1,210 @@
+@import 'tailwindcss';
+
+/*
+  Color tokens live here so contrast can be checked in one place
+  (src/test/contrast.test.ts). Components use the Tailwind names
+  mapped in the @theme block below, for example `bg-canvas` and `text-ink`.
+
+  Do not put a decorative gradient behind body text. Lighthouse measures
+  the painted background, and a tinted wash makes the contrast unpredictable.
+*/
+
+:root,
+[data-theme='light'] {
+  --canvas: #f3f6f5;
+  --surface: #ffffff;
+  --ink: #122028;
+  --muted: #3c4c58;
+  --accent: #0c5f5c;
+  --accent-ink: #f7fffe;
+  --chip: #e3f2f0;
+  --line: #d3e0de;
+  --live-fg: #0c5c34;
+  --live-bg: #e6f6ec;
+  --progress-fg: #6b4500;
+  --progress-bg: #fbf1d6;
+  --archived-fg: #3a4754;
+  --archived-bg: #eef1f4;
+  --shadow: 0 1px 2px rgb(18 32 40 / 0.05), 0 16px 40px rgb(18 32 40 / 0.06);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --canvas: #0b1220;
+  --surface: #121b2d;
+  --ink: #e7eef6;
+  --muted: #b7c5d4;
+  --accent: #8aeadc;
+  --accent-ink: #062421;
+  --chip: #14302d;
+  --line: #2a3a50;
+  --live-fg: #9be7bf;
+  --live-bg: #10281c;
+  --progress-fg: #f0d48a;
+  --progress-bg: #332812;
+  --archived-fg: #d0d8e2;
+  --archived-bg: #1b2534;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.32);
+  color-scheme: dark;
+}
+
+/* No-JavaScript visitors still follow the operating system. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --canvas: #0b1220;
+    --surface: #121b2d;
+    --ink: #e7eef6;
+    --muted: #b7c5d4;
+    --accent: #8aeadc;
+    --accent-ink: #062421;
+    --chip: #14302d;
+    --line: #2a3a50;
+    --live-fg: #9be7bf;
+    --live-bg: #10281c;
+    --progress-fg: #f0d48a;
+    --progress-bg: #332812;
+    --archived-fg: #d0d8e2;
+    --archived-bg: #1b2534;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 16px 40px rgb(0 0 0 / 0.32);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-chip: var(--chip);
+  --color-line: var(--line);
+  --font-sans: 'Outfit', 'Segoe UI', sans-serif;
+  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-mono: ui-monospace, 'JetBrains Mono', 'Segoe UI Mono', monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Programmatic target of the skip link. Parked off-screen until focused. */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 60;
+  transform: translateY(-200%);
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.shadow-card {
+  box-shadow: var(--shadow);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  padding: 0.2rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.badge-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.badge[data-status='live'] {
+  color: var(--live-fg);
+  background: var(--live-bg);
+}
+
+.badge[data-status='in-progress'] {
+  color: var(--progress-fg);
+  background: var(--progress-bg);
+}
+
+.badge[data-status='archived'] {
+  color: var(--archived-fg);
+  background: var(--archived-bg);
+}
+
+dialog {
+  color: inherit;
+  margin: 0;
+}
+
+/*
+ * Chrome's user-agent rule `dialog:modal` sets `inset: 0` and a max-width.
+ * That beats a single Tailwind class, so the menu opened from the left edge
+ * instead of the right. This selector is specific enough to win.
+ */
+#mobile-menu:modal {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: min(100%, 22rem);
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
+
+dialog::backdrop {
+  background: rgb(8 14 24 / 0.55);
+}
