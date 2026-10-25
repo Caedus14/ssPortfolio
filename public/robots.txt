@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://sethstearns.dev/sitemap.xml
