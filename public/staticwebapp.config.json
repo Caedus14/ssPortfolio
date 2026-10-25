@@ -20,6 +20,14 @@
       "/og.png"
     ]
   },
+  "routes": [
+    {
+      "route": "/resume.pdf",
+      "headers": {
+        "Content-Disposition": "attachment; filename=\"Seth_Stearns_Resume.pdf\""
+      }
+    }
+  ],
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",

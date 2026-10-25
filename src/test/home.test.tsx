@@ -1,3 +1,7 @@
+/// <reference types="node" />
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import * as content from '../data/content.ts';
@@ -23,10 +27,10 @@ describe('home page', () => {
       screen.getByRole('link', { name: 'seth.stearns@gmail.com' }),
     ).toHaveAttribute('href', 'mailto:seth.stearns@gmail.com');
     expect(screen.getAllByRole('link', { name: /LinkedIn/ }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /Download resume/ })[0]).toHaveAttribute(
-      'href',
-      '/resume.pdf',
-    );
+    for (const link of screen.getAllByRole('link', { name: /Download resume/ })) {
+      expect(link).toHaveAttribute('href', '/resume.pdf');
+      expect(link).toHaveAttribute('download', 'Seth_Stearns_Resume.pdf');
+    }
     expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute(
       'href',
       '#main',
@@ -34,6 +38,11 @@ describe('home page', () => {
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
+
+    const pdf = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../public/resume.pdf'),
+    );
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   });
 
   it('lazy-loads every content image', () => {
