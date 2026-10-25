@@ -130,15 +130,11 @@ Colors live as CSS variables in `src/index.css`. Tailwind utilities such as `bg-
 
 ### Resume PDF
 
-The download button points at `/resume.pdf` and suggests the filename `Seth-Stearns-Resume.pdf`. The PDF is not in git. `public/resume.pdf` is listed in `.gitignore` because it is easy to export a file that still contains a phone number or a street address.
+The Download resume button links to `/resume.pdf` and asks the browser to save the file as `Seth_Stearns_Resume.pdf`. On Azure, `public/staticwebapp.config.json` sends the same name in a `Content-Disposition` header, so the saved file keeps that name when the browser ignores the `download` attribute.
 
-To enable the download on your machine:
+The file that ships is `public/resume.pdf`. It is committed. It lists Eau Claire, WI and leaves out a phone number, a street address, and a ZIP code.
 
-1. Export a PDF that contains city and state only.
-2. Save it as `public/resume.pdf`.
-3. Deploy that file with the site (Azure will serve it). Leave it out of commits.
-
-Until that file exists, the button is a normal link and the browser will 404. That is expected in this repository.
+If you replace that file, read the new export before you commit it. The committed PDF has to stay phone-free.
 
 ## Deploy to Azure Static Web Apps
 

@@ -18,10 +18,9 @@ coverage
 .env.*
 !.env.example
 
-# Seth's resume download. Do not commit this file — it is easy to export a
-# PDF that still contains a phone number or street address. Add a phone-free
-# copy at public/resume.pdf on your own machine. See the README.
-public/resume.pdf
+# public/resume.pdf is committed on purpose. It is the public resume.
+# If you replace it, the new PDF must stay phone-free: city and state only,
+# with no street address and no ZIP code. See the README.
 
 # Editor directories and files
 .vscode/*
