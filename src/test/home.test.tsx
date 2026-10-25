@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import * as content from '../data/content.ts';
-import { features } from '../config/site.ts';
+import { features, pageUrl } from '../config/site.ts';
 import { renderApp } from './render.tsx';
 
 describe('home page', () => {
@@ -38,6 +38,14 @@ describe('home page', () => {
     expect(screen.getByRole('navigation', { name: 'Sections' })).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      pageUrl('/'),
+    );
+    expect(document.querySelector('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      pageUrl('/'),
+    );
 
     const pdf = readFileSync(
       resolve(dirname(fileURLToPath(import.meta.url)), '../../public/resume.pdf'),

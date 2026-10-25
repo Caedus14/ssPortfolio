@@ -16,6 +16,7 @@ export function ProjectPage() {
   usePageMeta(
     project ? `${project.title} · Seth Stearns` : 'Page not found · Seth Stearns',
     project?.summary ?? 'That link does not match a page on Seth Stearns’s site.',
+    project ? `/projects/${project.slug}` : '/',
   );
 
   if (!project) return <NotFoundPage />;

@@ -19,9 +19,10 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="en_US" />
-    %OG_URL% %CANONICAL%
-    <!-- Replaced at build time. Root-relative until VITE_SITE_URL is set. See the README. -->
-    <meta property="og:image" content="%OG_IMAGE%" />
+    <!-- Keep the origin in sync with siteUrl in src/config/site.ts. -->
+    <link rel="canonical" href="https://sethstearns.dev/" />
+    <meta property="og:url" content="https://sethstearns.dev/" />
+    <meta property="og:image" content="https://sethstearns.dev/og.png" />
     <meta property="og:image:alt" content="Seth Stearns, Application Developer" />
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -30,7 +31,7 @@
       name="twitter:description"
       content="Application developer building custom C# / .NET business applications, REST APIs, and Azure integrations. Based in Eau Claire, WI."
     />
-    <meta name="twitter:image" content="%OG_IMAGE%" />
+    <meta name="twitter:image" content="https://sethstearns.dev/og.png" />
     <meta name="twitter:image:alt" content="Seth Stearns, Application Developer" />
 
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

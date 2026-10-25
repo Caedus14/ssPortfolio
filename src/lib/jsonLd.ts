@@ -1,4 +1,4 @@
-import { siteUrl } from '../config/site.ts';
+import { pageUrl } from '../config/site.ts';
 import { links, profile } from '../data/content.ts';
 
 /**
@@ -22,6 +22,6 @@ export function personJsonLd(): Record<string, unknown> {
     knowsAbout: ['C#', '.NET', 'Microsoft Azure', 'REST APIs', 'SQL Server'],
   };
 
-  if (siteUrl) data.url = siteUrl;
+  data.url = pageUrl('/');
   return data;
 }
