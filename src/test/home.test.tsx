@@ -26,7 +26,15 @@ describe('home page', () => {
     expect(
       screen.getByRole('link', { name: 'seth.stearns@gmail.com' }),
     ).toHaveAttribute('href', 'mailto:seth.stearns@gmail.com');
-    expect(screen.getAllByRole('link', { name: /LinkedIn/ }).length).toBeGreaterThan(0);
+    const linkedIn = 'https://www.linkedin.com/in/seth-stearns-a34950104';
+    const linkedInLinks = screen.getAllByRole('link', { name: /LinkedIn/ });
+    expect(linkedInLinks.length).toBeGreaterThan(0);
+    for (const link of linkedInLinks) {
+      expect(link).toHaveAttribute('href', linkedIn);
+    }
+    expect(
+      document.querySelector('script[type="application/ld+json"]')?.textContent,
+    ).toContain(linkedIn);
     for (const link of screen.getAllByRole('link', { name: /Download resume/ })) {
       expect(link).toHaveAttribute('href', '/resume.pdf');
       expect(link).toHaveAttribute('download', 'Seth_Stearns_Resume.pdf');

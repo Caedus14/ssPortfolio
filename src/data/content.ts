@@ -49,7 +49,7 @@ export const profile: Profile = {
 /** Public URLs. The portfolio repository is this project, not a second GitHub profile. */
 export const links = {
   github: 'https://github.com/Caedus14',
-  linkedin: 'https://www.linkedin.com/in/seth-stearns',
+  linkedin: 'https://www.linkedin.com/in/seth-stearns-a34950104',
   portfolioRepo: 'https://github.com/Caedus14/ssPortfolio',
 } as const;
 
