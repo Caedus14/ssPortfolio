@@ -10,7 +10,7 @@ import { metaDescription, siteTitle } from '../data/content.ts';
 import { usePageMeta } from '../hooks/usePageMeta.ts';
 
 export function HomePage() {
-  usePageMeta(siteTitle, metaDescription);
+  usePageMeta(siteTitle, metaDescription, '/');
 
   return (
     <>

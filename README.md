@@ -1,6 +1,6 @@
 # Seth Stearns — portfolio
 
-Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. Phase 1 is a static site: the words live in one typed file, and the pages are generated at build time. There is no server and no database in this version.
+Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). Phase 1 is a static site: the words live in one typed file, and the pages are generated at build time. There is no server and no database in this version.
 
 Later phases can sit beside this without a rewrite:
 
@@ -33,7 +33,7 @@ public/                     Files copied into dist/ as-is
   favicon.svg
   apple-touch-icon.png
   og.png                    Social preview image
-  robots.txt
+  robots.txt                Allows all crawlers and points at the sitemap
   site.webmanifest
   staticwebapp.config.json  Azure Static Web Apps routing and headers
   images/                   Decorative project covers (SVG)
@@ -46,8 +46,8 @@ src/
     types.ts                TypeScript shapes (Profile, Experience, Project, …)
     content.ts              Every word on the site. Edit this, not the components.
   theme/                    Light / dark preference and localStorage
-  hooks/                    Scroll-spy and per-page title
-  lib/                      Small pure functions (filter, contrast helpers, JSON-LD)
+  hooks/                    Scroll-spy, per-page title, and canonical URL
+  lib/                      Small pure functions (filter, sitemap, JSON-LD)
   components/               Header, sections, cards, links
   pages/                    Home, project detail, not found
   test/                     Vitest tests
@@ -138,9 +138,15 @@ If you replace that file, read the new export before you commit it. The committe
 
 ## Deploy to Azure Static Web Apps
 
-This phase does not include a deploy workflow. The GitHub Actions file only checks the code. A deploy needs a Static Web Apps deployment token, which should stay in GitHub secrets.
+### Public URL
 
-In the Azure portal (or the Static Web Apps GitHub workflow Azure generates), use:
+The public origin is `https://sethstearns.dev`, defined once in `src/config/site.ts`. `www.sethstearns.dev` redirects to that apex. `index.html` repeats the same origin in the canonical link, `og:url`, `og:image`, and `twitter:image`, because crawlers read that file before JavaScript runs. After a client-side navigation, `usePageMeta` points `og:url` and the canonical link at the open route, including `/projects/:slug`. A test fails if `index.html` and `siteUrl` drift apart.
+
+### Custom domain
+
+DNS for the custom domain is on Cloudflare. `@` and `www` are DNS-only CNAMEs (grey cloud, so Cloudflare does not proxy the records) to `nice-rock-033c92210.2.azurestaticapps.net`. Azure's TXT validation record has to stay. Removing that TXT record makes Azure drop the custom domain.
+
+GitHub Actions CI only checks the code. `.github/workflows/azure-static-web-apps-nice-rock-033c92210.yml` builds the site and deploys `dist` to Azure Static Web Apps. The deployment token stays in GitHub secrets.
 
 | Setting         | Value                     |
 | --------------- | ------------------------- |
@@ -150,19 +156,13 @@ In the Azure portal (or the Static Web Apps GitHub workflow Azure generates), us
 
 `public/staticwebapp.config.json` is copied into `dist/` by Vite. It does three jobs:
 
-- Sends unknown paths (such as `/projects/homelab`) to `index.html` so React Router can render them. Files that exist on disk, including `*.pdf` and `/resume.pdf`, are excluded and served directly.
+- Sends unknown paths (such as `/projects/homelab`) to `index.html` so React Router can render them. Files that exist on disk, including `*.pdf`, `/resume.pdf`, `/robots.txt`, and `/sitemap.xml`, are excluded and served directly.
 - Sets basic response headers: `nosniff`, a strict referrer policy, `X-Frame-Options: DENY`, and a permissions policy that turns the camera, microphone, and geolocation off.
-- Declares MIME types for `.webmanifest` and `.pdf`.
+- Declares MIME types for `.webmanifest`, `.pdf`, and `.xml`.
 
-Set `VITE_SITE_URL` in the Azure build environment once you have a hostname, with no trailing slash:
+`vite build` writes `dist/sitemap.xml` from the project list in `src/data/content.ts`. The file is generated instead of hand-edited, so a new project shows up in the sitemap on the next build. `public/robots.txt` allows every crawler and lists `https://sethstearns.dev/sitemap.xml`.
 
-```bash
-VITE_SITE_URL=https://your-app.azurestaticapps.net
-```
-
-The Vite plugin in `vite.config.ts` then writes the canonical link, `og:url`, and an absolute `og:image`. A value that is not an `http` or `https` origin is ignored, and the image stays root-relative (`/og.png`). Copy `.env.example` to `.env` for local builds. `.env` is gitignored.
-
-`VITE_CONTACT_API_URL` is reserved for Phase 2. It is unused while `features.contactApi` is `false`.
+`VITE_CONTACT_API_URL` is reserved for Phase 2. It is unused while `features.contactApi` is `false`. Copy `.env.example` to `.env` when you need that variable. `.env` is gitignored.
 
 One tradeoff of the SPA fallback: a path that does not match a project still returns HTTP 200 with the "Page not found" screen. Azure is serving `index.html` on purpose so client-side routes work. A true 404 status would need a Static Web Apps function or a route rule per project slug.
 
@@ -185,7 +185,8 @@ A Content-Security-Policy header is not set. The theme script in `index.html` is
 - Theme toggle writes `localStorage` and follows the system preference until a choice is saved.
 - Home page includes resume facts, landmarks, and the `/resume.pdf` link.
 - Rendered text and the content module contain no phone number, street, or ZIP.
-- Contrast tokens meet WCAG AA, and `index.html` matches `content.ts`.
+- Contrast tokens meet WCAG AA, and `index.html` matches `content.ts` and `siteUrl`.
+- The sitemap lists the home page and every project, and Azure is told to serve `sitemap.xml` as XML.
 
 Tests render with `css: false`, so Tailwind's `hidden` / `lg:block` do not remove elements in jsdom. Both the mobile and desktop controls are in the document. Queries that can match twice (the theme button, LinkedIn) use `getAllByRole`.
 

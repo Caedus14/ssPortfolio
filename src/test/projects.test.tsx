@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { StatusBadge } from '../components/StatusBadge.tsx';
+import { pageUrl } from '../config/site.ts';
 import { links } from '../data/content.ts';
 import { renderApp } from './render.tsx';
 
@@ -51,6 +52,14 @@ describe('projects', () => {
     );
     expect(screen.queryByRole('link', { name: /Live demo/ })).not.toBeInTheDocument();
     expect(screen.getByText('No public demo is listed.')).toBeInTheDocument();
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      pageUrl('/projects/portfolio'),
+    );
+    expect(document.querySelector('meta[property="og:url"]')).toHaveAttribute(
+      'content',
+      pageUrl('/projects/portfolio'),
+    );
   });
 
   it('keeps the homelab private', () => {
@@ -68,6 +77,10 @@ describe('projects', () => {
       screen.getByText('No public source repository is listed.'),
     ).toBeInTheDocument();
     expect(screen.getByText('No public demo is listed.')).toBeInTheDocument();
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      pageUrl('/projects/homelab'),
+    );
   });
 
   it('explains an unknown project address', () => {

@@ -1,12 +1,14 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { PageMain } from '../components/PageMain.tsx';
 import { SiteFooter } from '../components/SiteFooter.tsx';
 import { usePageMeta } from '../hooks/usePageMeta.ts';
 
 export function NotFoundPage() {
+  const { pathname } = useLocation();
   usePageMeta(
     'Page not found · Seth Stearns',
     'That link does not match a page on Seth Stearns’s site.',
+    pathname,
   );
 
   return (

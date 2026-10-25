@@ -8,19 +8,40 @@
  * Phase 3 — admin dashboard:
  *   Add a route in App.tsx. Forms there should edit the types in
  *   src/data/types.ts rather than inventing a second content shape.
- *
- * VITE_SITE_URL is the public origin, no trailing slash, for example
- * https://your-app.azurestaticapps.net. Leave it unset until that hostname exists.
- * A value that is not an http(s) origin is ignored.
  */
-const rawSiteUrl = (import.meta.env.VITE_SITE_URL ?? '').trim().replace(/\/$/, '');
 
-export const siteUrl = /^https?:\/\/[a-zA-Z0-9.-]+(?::\d+)?$/.test(rawSiteUrl)
-  ? rawSiteUrl
-  : '';
+/**
+ * Public origin, no trailing slash.
+ *
+ * https://sethstearns.dev is the custom domain. www.sethstearns.dev redirects
+ * to this apex. index.html repeats the origin in the canonical and social
+ * tags, because crawlers read that file before React runs. The meta test
+ * fails if those copies drift apart.
+ */
+export const siteUrl = 'https://sethstearns.dev';
+
+/**
+ * Absolute URL for a route on this site.
+ * The home page keeps a trailing slash: https://sethstearns.dev/
+ */
+export function pageUrl(path: string): string {
+  if (path === '' || path === '/') return `${siteUrl}/`;
+  const withSlash = path.startsWith('/') ? path : `/${path}`;
+  const trimmed = withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash;
+  return `${siteUrl}${trimmed}`;
+}
 
 export const features = {
   contactApi: false,
 } as const;
 
-export const contactApiUrl = import.meta.env.VITE_CONTACT_API_URL ?? '';
+/**
+ * Read this way so the Vite config can import `siteUrl` during `tsc -b`.
+ * The Node program that typechecks vite.config.ts does not include Vite's
+ * `import.meta.env` types. The browser build still injects the variable.
+ */
+const viteEnv = import.meta as ImportMeta & {
+  env?: { VITE_CONTACT_API_URL?: string };
+};
+
+export const contactApiUrl = viteEnv.env?.VITE_CONTACT_API_URL ?? '';

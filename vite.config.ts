@@ -1,40 +1,45 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { loadEnv, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { projects } from './src/data/content.ts';
+import { renderSitemap } from './src/lib/sitemap.ts';
 
 /**
- * Social crawlers do not run the React app, so Open Graph tags have to be in
- * index.html. The image stays root-relative ("/og.png") until VITE_SITE_URL is
- * a real https origin, because a crawler needs an absolute image URL.
+ * Writes sitemap.xml from the project list. Dev serves it in memory.
+ * `vite build` emits it next to index.html so Azure can serve the file.
  */
-function siteUrlPlugin(siteUrl: string): Plugin {
-  const safe = /^https?:\/\/[a-zA-Z0-9.-]+(?::\d+)?$/.test(siteUrl) ? siteUrl : '';
-  const image = `${safe}/og.png`;
-  const canonical = safe ? `<link rel="canonical" href="${safe}" />` : '';
-  const ogUrl = safe ? `<meta property="og:url" content="${safe}" />` : '';
+function sitemapPlugin(): Plugin {
+  const xml = () => renderSitemap(projects);
 
   return {
-    name: 'site-url',
-    transformIndexHtml(html) {
-      return html
-        .replaceAll('%OG_IMAGE%', image)
-        .replaceAll('%CANONICAL%', canonical)
-        .replaceAll('%OG_URL%', ogUrl);
+    name: 'sitemap',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = req.url?.split('?')[0];
+        if (path !== '/sitemap.xml') {
+          next();
+          return;
+        }
+        res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+        res.end(xml());
+      });
+    },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'sitemap.xml',
+        source: xml(),
+      });
     },
   };
 }
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  const siteUrl = (env.VITE_SITE_URL ?? '').trim().replace(/\/$/, '');
-
-  return {
-    plugins: [react(), tailwindcss(), siteUrlPlugin(siteUrl)],
-    test: {
-      environment: 'jsdom',
-      setupFiles: './src/test/setup.ts',
-      css: false,
-    },
-  };
+export default defineConfig({
+  plugins: [react(), tailwindcss(), sitemapPlugin()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+    css: false,
+  },
 });
