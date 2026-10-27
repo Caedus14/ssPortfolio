@@ -1,31 +1,27 @@
-/*
-    002_usp_SubmitContact.sql
-    -------------------------
-    Creates or replaces the only procedure the contact API will call.
-
-    Run this second, connected to ssportfolio, not master. This file is one
-    batch on purpose: SQL Server requires CREATE PROCEDURE to be the only
-    statement in its batch, and the portal Query editor cannot run GO.
-
-    Before you run it, check the database name shown in the query editor.
-    If you run it in master by mistake, switch to ssportfolio and run:
-
-        DROP PROCEDURE IF EXISTS dbo.usp_SubmitContact;
-
-    in master, then run this file again in ssportfolio.
-
-    Safe to run again. CREATE OR ALTER replaces the procedure body.
-*/
+-- 002_usp_SubmitContact.sql
+-- -------------------------
+-- Creates or replaces the only procedure the contact API will call.
+--
+-- Run this second, connected to ssportfolio, not master. This file is one
+-- batch on purpose: SQL Server requires CREATE PROCEDURE to be the only
+-- statement in its batch, and the portal Query editor cannot run GO.
+--
+-- Before you run it, check the database name shown in the query editor.
+-- If you run it in master by mistake, switch to ssportfolio and run:
+--
+--     DROP PROCEDURE IF EXISTS dbo.usp_SubmitContact;
+--
+-- in master, then run this file again in ssportfolio.
+--
+-- Safe to run again. CREATE OR ALTER replaces the procedure body.
 
 CREATE OR ALTER PROCEDURE dbo.usp_SubmitContact
     @Name nvarchar(200),
     @Email nvarchar(320),
     @Message nvarchar(4000),
     @IpHash varbinary(64),
-    /*
-        Defaults are the product limits. A later admin tool can pass other
-        numbers without editing this body. Tests do that too.
-    */
+    -- Defaults are the product limits. A later admin tool can pass other
+    -- numbers without editing this body. Tests do that too.
     @IpBurstLimit int = 3,
     @IpBurstMinutes int = 10,
     @IpDailyLimit int = 10,
@@ -37,19 +33,17 @@ BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    /*
-        Result codes the API should map:
-
-        0 accepted              message stored, MessageId is set
-        1 rate_limited_ip       this hash is over its burst or daily limit
-        2 rate_limited_global   the whole site is over the daily cap
-        3 invalid               input failed the length or shape checks
-        5 busy                  another call held the lock; try again shortly
-
-        Reason adds detail the code does not: ip_burst, ip_daily, or a
-        short explanation for invalid input.
-        RetryAfterSeconds is how long to wait before one slot opens.
-    */
+    -- Result codes the API should map:
+    --
+    -- 0 accepted              message stored, MessageId is set
+    -- 1 rate_limited_ip       this hash is over its burst or daily limit
+    -- 2 rate_limited_global   the whole site is over the daily cap
+    -- 3 invalid               input failed the length or shape checks
+    -- 5 busy                  another call held the lock; try again shortly
+    --
+    -- Reason adds detail the code does not: ip_burst, ip_daily, or a
+    -- short explanation for invalid input.
+    -- RetryAfterSeconds is how long to wait before one slot opens.
     DECLARE @ResultCode int;
     DECLARE @ResultName nvarchar(40);
     DECLARE @RetryAfterSeconds int;
@@ -93,13 +87,11 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        /*
-            One lock for every caller. The site accepts about 50 messages a
-            day, so serializing them is cheap and makes the counts exact.
-            Two requests at the same moment cannot both read "49" and both
-            insert. The per-IP check uses the same lock, which also avoids
-            lock-order deadlocks.
-        */
+        -- One lock for every caller. The site accepts about 50 messages a
+        -- day, so serializing them is cheap and makes the counts exact.
+        -- Two requests at the same moment cannot both read "49" and both
+        -- insert. The per-IP check uses the same lock, which also avoids
+        -- lock-order deadlocks.
         DECLARE @LockResult int;
         EXEC @LockResult = sys.sp_getapplock
             @Resource = N'usp_SubmitContact',
@@ -119,10 +111,8 @@ BEGIN
             RETURN 5;
         END;
 
-        /*
-            Drop old hit rows while we hold the lock. 48 hours is longer
-            than the 24-hour window, so cleanup cannot change a decision.
-        */
+        -- Drop old hit rows while we hold the lock. 48 hours is longer
+        -- than the 24-hour window, so cleanup cannot change a decision.
         DELETE FROM dbo.ContactRateLimitHit
         WHERE HitAtUtc < DATEADD(hour, -@RetentionHours, @Now);
 
@@ -132,11 +122,9 @@ BEGIN
         DECLARE @DailyCount int;
         DECLARE @GlobalCount int;
 
-        /*
-            HOLDLOCK keeps these reads stable until the transaction ends.
-            The application lock above is the real guard. HOLDLOCK is the
-            backup if a future edit removes that lock.
-        */
+        -- HOLDLOCK keeps these reads stable until the transaction ends.
+        -- The application lock above is the real guard. HOLDLOCK is the
+        -- backup if a future edit removes that lock.
         SELECT @BurstCount = COUNT(*)
         FROM dbo.ContactRateLimitHit WITH (HOLDLOCK)
         WHERE IpHash = @IpHash
@@ -153,11 +141,9 @@ BEGIN
 
         IF @BurstCount >= @IpBurstLimit
         BEGIN
-            /*
-                Age out enough of the oldest hits in this window that one
-                more submission would fit. With the usual numbers, that is
-                the single oldest hit in the 10-minute window.
-            */
+            -- Age out enough of the oldest hits in this window that one
+            -- more submission would fit. With the usual numbers, that is
+            -- the single oldest hit in the 10-minute window.
             DECLARE @BurstSlot datetime2(3);
             SELECT @BurstSlot = HitAtUtc
             FROM (

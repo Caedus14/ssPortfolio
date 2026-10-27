@@ -1,31 +1,29 @@
-/*
-    003_contact_api_user.sql
-    ------------------------
-    Creates the login the Azure Function will use, and lets it run
-    usp_SubmitContact. It grants nothing else. The function cannot read
-    or edit the tables directly.
-
-    Run this third, connected to ssportfolio, not master.
-
-    Before the first run, replace REPLACE_WITH_A_STRONG_PASSWORD below.
-    Do not commit the real password. Generate one on your machine:
-
-        python3 -c "import secrets,string; chars=string.ascii_letters+string.digits+'!@#$%^&*-_'; print(''.join(secrets.choice(chars) for _ in range(40)))"
-
-    Azure SQL checks password complexity: at least 8 characters, from three
-    of uppercase, lowercase, digits, and symbols. This script asks for 20
-    characters and all four classes so the portal does not reject it later.
-
-    Running this file again does not change an existing password. To rotate
-    the password later, run this on its own, with a new password:
-
-        ALTER USER contact_api WITH PASSWORD = N'a-new-strong-password';
-
-    Azure SQL already allows contained users (a user that lives in the
-    database, with no server login). That is what Static Web Apps needs,
-    because the managed Function cannot use a managed identity against
-    SQL. Local SQL Server is different. See db/README.md.
-*/
+-- 003_contact_api_user.sql
+-- ------------------------
+-- Creates the login the Azure Function will use, and lets it run
+-- usp_SubmitContact. It grants nothing else. The function cannot read
+-- or edit the tables directly.
+--
+-- Run this third, connected to ssportfolio, not master.
+--
+-- Before the first run, replace REPLACE_WITH_A_STRONG_PASSWORD below.
+-- Do not commit the real password. Generate one on your machine:
+--
+--     python3 -c "import secrets,string; chars=string.ascii_letters+string.digits+'!@#$%^&*-_'; print(''.join(secrets.choice(chars) for _ in range(40)))"
+--
+-- Azure SQL checks password complexity: at least 8 characters, from three
+-- of uppercase, lowercase, digits, and symbols. This script asks for 20
+-- characters and all four classes so the portal does not reject it later.
+--
+-- Running this file again does not change an existing password. To rotate
+-- the password later, run this on its own, with a new password:
+--
+--     ALTER USER contact_api WITH PASSWORD = N'a-new-strong-password';
+--
+-- Azure SQL already allows contained users (a user that lives in the
+-- database, with no server login). That is what Static Web Apps needs,
+-- because the managed Function cannot use a managed identity against
+-- SQL. Local SQL Server is different. See db/README.md.
 
 IF DB_NAME() = N'master'
     THROW 51002, N'Connect to the ssportfolio database, not master, then run this script again.', 1;
@@ -41,7 +39,7 @@ IF NOT EXISTS (
     WHERE name = N'contact_api'
 )
 BEGIN
-    /* Edit only this line. Leave the checks below alone. */
+    -- Edit only this line. Leave the checks below alone.
     DECLARE @Password nvarchar(128) = N'REPLACE_WITH_A_STRONG_PASSWORD';
 
     IF @Password LIKE N'%REPLACE_WITH_A_STRONG%'
@@ -54,11 +52,9 @@ BEGIN
         OR @Password COLLATE Latin1_General_BIN NOT LIKE N'%[^0-9A-Za-z]%'
         THROW 51001, N'Password must be at least 20 characters and include an uppercase letter, a lowercase letter, a digit, and a symbol.', 1;
 
-    /*
-        CREATE USER needs a string literal. Build that statement here so
-        the password check above can run first. Quotes inside the password
-        are doubled so they stay inside the string.
-    */
+    -- CREATE USER needs a string literal. Build that statement here so
+    -- the password check above can run first. Quotes inside the password
+    -- are doubled so they stay inside the string.
     DECLARE @CreateUser nvarchar(400) =
         N'CREATE USER contact_api WITH PASSWORD = N'''
         + REPLACE(@Password, N'''', N'''''')
@@ -67,12 +63,10 @@ BEGIN
     EXEC sys.sp_executesql @CreateUser;
 END;
 
-/*
-    EXECUTE is the only permission. The procedure and the tables are both
-    owned by dbo, so SQL Server's ownership chain lets the procedure write
-    the tables without granting contact_api access to the tables themselves.
-
-    Do not add contact_api to db_owner, db_datareader, or db_datawriter.
-    GRANT is safe to run more than once.
-*/
+-- EXECUTE is the only permission. The procedure and the tables are both
+-- owned by dbo, so SQL Server's ownership chain lets the procedure write
+-- the tables without granting contact_api access to the tables themselves.
+--
+-- Do not add contact_api to db_owner, db_datareader, or db_datawriter.
+-- GRANT is safe to run more than once.
 GRANT EXECUTE ON dbo.usp_SubmitContact TO contact_api;

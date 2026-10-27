@@ -6,6 +6,8 @@ The database is the free Azure SQL offer: serverless, auto-pause, server `sethst
 
 Run the scripts yourself in the Azure portal Query editor. They are plain T-SQL. They do not use SQLCMD commands such as `:setvar`, and they do not use `GO`. The portal runs the whole editor as one batch, and `GO` is only a separator for tools like SSMS and `sqlcmd`. `GO` in the portal fails with a syntax error.
 
+The same editor rejects slash-star block comments. Pasting the old `001_tables.sql` failed with `Missing end comment mark '*/'. Failed to execute query.` The same statements run once those comments are removed. The IPv6 note in that file contained `/64` inside the block comment, and a `/` in that spot is enough for this editor's parser to lose the closing mark. These scripts use only `--` line comments. A `--` line can still mention a path such as `db/README.md` or the `/64` prefix. Keep new notes in that style.
+
 ## What each script does
 
 Run them in this order, one file per Run click. Clear the editor between files so two files are never submitted together.
