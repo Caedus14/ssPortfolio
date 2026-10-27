@@ -1,10 +1,10 @@
 # Seth Stearns — portfolio
 
-Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). Phase 1 is a static site: the words live in one typed file, and the pages are generated at build time. There is no server and no database in this version.
+Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). The live site is still a static build. The SQL scripts for the later contact database are in [`db/`](db/README.md).
 
 Later phases can sit beside this without a rewrite:
 
-- **Phase 2** adds an ASP.NET Core contact API and Azure SQL. The switch for that is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
+- **Phase 2** adds an ASP.NET Core contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API itself is not in this repo yet. The switch for the form is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
 - **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
 
 The repository is public. There is no license file, by choice. See [Rights](#rights).
@@ -52,6 +52,10 @@ src/
   pages/                    Home, project detail, not found
   test/                     Vitest tests
 .github/workflows/ci.yml
+db/                         Azure SQL scripts for the contact form (see db/README.md)
+  001_tables.sql
+  002_usp_SubmitContact.sql
+  003_contact_api_user.sql
 ```
 
 On a wide screen the header stays fixed on the left (name, title, section links, social links) and the sections scroll on the right. On a narrow screen the layout is one column and the section links move into a menu button.
