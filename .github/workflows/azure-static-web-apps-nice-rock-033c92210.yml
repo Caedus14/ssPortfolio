@@ -19,6 +19,19 @@ jobs:
         with:
           submodules: true
           lfs: false
+      # Build the React app here, with the same Node version CI uses.
+      # app_location is the built dist folder, and skip_app_build is set,
+      # so the deploy uploads only that folder. Pointing app_location at the
+      # repo root would upload node_modules too, and Azure rejects the
+      # deploy because there are too many static files. Oryx still publishes
+      # the Functions app from api_location.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build the static site
+        run: npm ci && npm run build
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -28,9 +41,10 @@ jobs:
           action: 'upload'
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: '/' # App source code path
-          api_location: '' # Api source code path - optional
-          output_location: 'dist' # Built app content directory - optional
+          app_location: 'dist' # Already-built static files
+          api_location: 'api' # .NET isolated Functions project. Oryx publishes it.
+          output_location: '' # Empty because app_location is already the build output
+          skip_app_build: true
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:

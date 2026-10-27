@@ -22,6 +22,14 @@ coverage
 # If you replace it, the new PDF must stay phone-free: city and state only,
 # with no street address and no ZIP code. See the README.
 
+# .NET build output
+bin/
+obj/
+
+# Azure Functions local settings. Copy api/local.settings.json.example and
+# fill it in on your machine. The example file is the one that stays in git.
+local.settings.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -31,4 +39,5 @@ coverage
 *.ntvs*
 *.njsproj
 *.sln
+!ssportfolio.sln
 *.sw?

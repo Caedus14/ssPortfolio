@@ -7,3 +7,7 @@ insert_final_newline = true
 indent_style = space
 indent_size = 2
 trim_trailing_whitespace = true
+
+# C# and project files stay on the .NET 4-space layout.
+[*.{cs,csproj}]
+indent_size = 4
