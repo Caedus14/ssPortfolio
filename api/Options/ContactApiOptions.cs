@@ -23,6 +23,16 @@ public sealed class ContactApiOptions
 
     /// <summary>HMAC key for IIpAddressHasher. Treat it like a password.</summary>
     public string? IpHashKey { get; set; }
+
+    /// <summary>
+    /// HMAC key for form tokens only. This is a different secret from
+    /// <see cref="IpHashKey" />. The hash key can test an IP address
+    /// against a stored hash. The token key only proves when a form was loaded.
+    /// A leak of one secret should not hand over the other, and they rotate
+    /// on different days: changing the hash key makes old hashes unsearchable,
+    /// while changing this key only asks open forms to reload.
+    /// </summary>
+    public string? FormTokenKey { get; set; }
 }
 
 public static class ContactApiOptionsBinder
@@ -32,5 +42,6 @@ public static class ContactApiOptionsBinder
         options.SqlConnectionString = configuration["SQL_CONNECTION_STRING"];
         options.TurnstileSecret = configuration["TURNSTILE_SECRET"];
         options.IpHashKey = configuration["IP_HASH_KEY"];
+        options.FormTokenKey = configuration["FORM_TOKEN_KEY"];
     }
 }
