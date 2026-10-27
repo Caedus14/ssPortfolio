@@ -20,9 +20,11 @@ jobs:
           submodules: true
           lfs: false
       # Build the React app here, with the same Node version CI uses.
-      # skip_app_build below tells Oryx not to build the repo root. The root
-      # now contains a .NET project, and Oryx would treat that project as the
-      # static site. The API is a separate Oryx build, from api_location.
+      # app_location is the built dist folder, and skip_app_build is set,
+      # so the deploy uploads only that folder. Pointing app_location at the
+      # repo root would upload node_modules too, and Azure rejects the
+      # deploy because there are too many static files. Oryx still publishes
+      # the Functions app from api_location.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,9 +41,9 @@ jobs:
           action: 'upload'
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: '/' # App source code path
+          app_location: 'dist' # Already-built static files
           api_location: 'api' # .NET isolated Functions project. Oryx publishes it.
-          output_location: 'dist' # Built app content directory - optional
+          output_location: '' # Empty because app_location is already the build output
           skip_app_build: true
           ###### End of Repository/Build Configurations ######
 

@@ -167,12 +167,12 @@ GitHub Actions CI only checks the code. `.github/workflows/azure-static-web-apps
 
 | Setting         | Value                  |
 | --------------- | ---------------------- |
-| App location    | `/`                    |
-| Output location | `dist`                 |
+| App location    | `dist`                 |
+| Output location | empty                  |
 | API location    | `api`                  |
 | API runtime     | `dotnet-isolated:10.0` |
 
-The workflow builds the site with `npm ci` and `npm run build` before the deploy action, then sets `skip_app_build` so Oryx does not build the repo root. The root now contains the .NET project, and Oryx would treat that project as the static site. Oryx still publishes the Functions app from `api/`. `public/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`, which is the Static Web Apps name for the .NET 10 isolated worker.
+The workflow builds the site with `npm ci` and `npm run build`, then deploys that `dist` folder with `skip_app_build`. The app location is `dist` itself, not the repo root. `npm ci` creates `node_modules`, and uploading the root would send those files too. Azure then rejects the deploy because the static file count is too high. Oryx still publishes the Functions app from `api/`. `public/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`, which is the Static Web Apps name for the .NET 10 isolated worker.
 
 Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. The contact route does not read them yet.
 
