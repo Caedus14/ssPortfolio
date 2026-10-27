@@ -1,8 +1,9 @@
 /**
  * Phase seams. Phase 1 is a static site and does not call an API.
  *
- * Phase 2 — ASP.NET Core contact API + Azure SQL:
- *   Set contactApi to true and VITE_CONTACT_API_URL to the API origin.
+ * Phase 2 — Azure Functions contact API (api/) + Azure SQL:
+ *   The skeleton is deployed, and POST /api/contact is still a 501.
+ *   Set contactApi to true only when a later change adds the real form.
  *   ContactSection is the only UI that should grow a form.
  *
  * Phase 3 — admin dashboard:

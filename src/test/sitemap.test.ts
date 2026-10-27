@@ -35,5 +35,6 @@ describe('crawler files', () => {
     expect(config).toContain('"/sitemap.xml"');
     expect(config).toContain('"*.xml"');
     expect(config).toContain('"application/xml"');
+    expect(config).toContain('"dotnet-isolated:10.0"');
   });
 });

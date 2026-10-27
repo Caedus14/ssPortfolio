@@ -37,6 +37,17 @@ function sitemapPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), sitemapPlugin()],
+  server: {
+    // Dev only. The browser calls same-origin /api, and Vite forwards it to
+    // the Functions host. Production does not use this. Static Web Apps
+    // routes /api to the managed function.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:7071',
+        changeOrigin: true,
+      },
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',

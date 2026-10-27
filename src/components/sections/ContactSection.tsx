@@ -8,7 +8,8 @@ import { Section } from '../Section.tsx';
 const section = sectionById('contact');
 
 /**
- * Phase 2 adds a form here when `features.contactApi` in src/config/site.ts
+ * The API skeleton is in api/, and POST /api/contact returns 501.
+ * A form belongs here only after `features.contactApi` in src/config/site.ts
  * is turned on. Until then the only actions are links. There is no phone number.
  */
 export function ContactSection() {

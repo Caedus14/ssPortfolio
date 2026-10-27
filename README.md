@@ -1,27 +1,28 @@
 # Seth Stearns — portfolio
 
-Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). The live site is still a static build. The SQL scripts for the later contact database are in [`db/`](db/README.md).
+Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). The SQL scripts for the contact database are in [`db/`](db/README.md). The contact API skeleton is in [`api/`](api/README.md). The page still does not show a form.
 
 Later phases can sit beside this without a rewrite:
 
-- **Phase 2** adds an ASP.NET Core contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API itself is not in this repo yet. The switch for the form is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
+- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, and a contact route that returns 501. The switch for the form is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
 - **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
 
 The repository is public. There is no license file, by choice. See [Rights](#rights).
 
 ## Tech stack
 
-| Piece                                                                           | Role                                                                                                                  |
-| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| [React 19](https://react.dev/)                                                  | UI components.                                                                                                        |
-| [TypeScript](https://www.typescriptlang.org/) (strict)                          | Types for content and components, so a typo in the resume data fails the build.                                       |
-| [Vite](https://vite.dev/)                                                       | Dev server and production bundler. `npm run dev` reloads as you edit. `npm run build` writes static files to `dist/`. |
-| [Tailwind CSS 4](https://tailwindcss.com/)                                      | Utility classes for layout and spacing. Colors are CSS variables, so light and dark share one set of class names.     |
-| [Framer Motion](https://www.framer.com/motion/)                                 | Short entrance motion on sections. It is skipped when the visitor asks for reduced motion.                            |
-| [React Router](https://reactrouter.com/)                                        | Home page, `/projects/:slug` detail pages, and a not-found page.                                                      |
-| [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) | Tests that render the page the way a visitor would: click a filter, toggle the theme, read the text.                  |
-| ESLint + Prettier                                                               | Lint rules (including accessibility) and one formatting style.                                                        |
-| GitHub Actions                                                                  | On every push to `main` and every pull request: lint, format check, typecheck, test, and build.                       |
+| Piece                                                                           | Role                                                                                                                                                |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [React 19](https://react.dev/)                                                  | UI components.                                                                                                                                      |
+| [TypeScript](https://www.typescriptlang.org/) (strict)                          | Types for content and components, so a typo in the resume data fails the build.                                                                     |
+| [Vite](https://vite.dev/)                                                       | Dev server and production bundler. `npm run dev` reloads as you edit. `npm run build` writes static files to `dist/`.                               |
+| [Tailwind CSS 4](https://tailwindcss.com/)                                      | Utility classes for layout and spacing. Colors are CSS variables, so light and dark share one set of class names.                                   |
+| [Framer Motion](https://www.framer.com/motion/)                                 | Short entrance motion on sections. It is skipped when the visitor asks for reduced motion.                                                          |
+| [React Router](https://reactrouter.com/)                                        | Home page, `/projects/:slug` detail pages, and a not-found page.                                                                                    |
+| [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) | Tests that render the page the way a visitor would: click a filter, toggle the theme, read the text.                                                |
+| ESLint + Prettier                                                               | Lint rules (including accessibility) and one formatting style.                                                                                      |
+| GitHub Actions                                                                  | On every push to `main` and every pull request: lint, format check, typecheck, test, and build. A second job runs `dotnet build` and `dotnet test`. |
+| .NET 10 isolated Functions                                                      | The contact API in `api/`. Static Web Apps hosts it as a managed function. See [`api/README.md`](api/README.md).                                    |
 
 Fonts (Outfit and Fraunces) are bundled from `@fontsource`, Latin subset only. The site does not call Google Fonts or an analytics service.
 
@@ -52,6 +53,8 @@ src/
   pages/                    Home, project detail, not found
   test/                     Vitest tests
 .github/workflows/ci.yml
+api/                        .NET 10 isolated Functions for the contact form (see api/README.md)
+api.tests/                  xUnit tests for that Functions project
 db/                         Azure SQL scripts for the contact form (see db/README.md)
   001_tables.sql
   002_usp_SubmitContact.sql
@@ -70,6 +73,16 @@ npm run dev     # http://localhost:5173
 ```
 
 `npm ci` is the same command CI uses. The repo includes an `.npmrc` with `legacy-peer-deps=true` because npm 10's resolver crashes on this dependency tree (`Cannot read properties of null (reading 'edgesOut')`). The lockfile still pins versions.
+
+The API runs beside the site. You need the .NET 10 SDK and Azure Functions Core Tools v4. Copy `api/local.settings.json.example` to `api/local.settings.json` (that copy is gitignored), then:
+
+```bash
+dotnet test ssportfolio.sln
+cd api && func start          # http://localhost:7071/api/health
+npm run dev                   # http://localhost:5173/api/health proxies to the host
+```
+
+`npm run dev` forwards `/api` to port 7071. The production build does not. Azure routes `/api` itself. Details, including the Static Web Apps CLI, are in [`api/README.md`](api/README.md).
 
 Other scripts:
 
@@ -152,11 +165,16 @@ DNS for the custom domain is on Cloudflare. `@` and `www` are DNS-only CNAMEs (g
 
 GitHub Actions CI only checks the code. `.github/workflows/azure-static-web-apps-nice-rock-033c92210.yml` builds the site and deploys `dist` to Azure Static Web Apps. The deployment token stays in GitHub secrets.
 
-| Setting         | Value                     |
-| --------------- | ------------------------- |
-| App location    | `/`                       |
-| Output location | `dist`                    |
-| API location    | leave empty until Phase 2 |
+| Setting         | Value                  |
+| --------------- | ---------------------- |
+| App location    | `/`                    |
+| Output location | `dist`                 |
+| API location    | `api`                  |
+| API runtime     | `dotnet-isolated:10.0` |
+
+The workflow builds the site with `npm ci` and `npm run build` before the deploy action, then sets `skip_app_build` so Oryx does not build the repo root. The root now contains the .NET project, and Oryx would treat that project as the static site. Oryx still publishes the Functions app from `api/`. `public/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`, which is the Static Web Apps name for the .NET 10 isolated worker.
+
+Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. The contact route does not read them yet.
 
 `public/staticwebapp.config.json` is copied into `dist/` by Vite. It does three jobs:
 
