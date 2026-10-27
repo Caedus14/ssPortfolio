@@ -26,7 +26,7 @@ public sealed class ContactRequestDto
     /// <summary>Signed issued-at token from GET /api/contact/token.</summary>
     public string? FormToken { get; set; }
 
-    /// <summary>Reserved for the Turnstile check. Accepted and not verified yet.</summary>
+    /// <summary>Token from the Turnstile widget. The server checks it with siteverify.</summary>
     public string? TurnstileToken { get; set; }
 }
 
@@ -46,6 +46,8 @@ public enum ContactSubmitStatus
     FormTokenUnavailable,
     FormTokenRejected,
     InvalidFields,
+    TurnstileRejected,
+    TurnstileUnavailable,
 }
 
 public enum FormTokenVerdict
@@ -119,11 +121,14 @@ public static class ContactResponses
                 return Error(StatusCodes.Status503ServiceUnavailable, "form_token_unavailable");
             case ContactSubmitStatus.FormTokenRejected:
             case ContactSubmitStatus.InvalidFields:
+            case ContactSubmitStatus.TurnstileRejected:
                 return Error(
                     StatusCodes.Status400BadRequest,
                     result.Error ?? "invalid",
                     result.FieldErrors
                 );
+            case ContactSubmitStatus.TurnstileUnavailable:
+                return Error(StatusCodes.Status503ServiceUnavailable, "turnstile_unavailable");
             default:
                 return Error(StatusCodes.Status500InternalServerError, "error");
         }

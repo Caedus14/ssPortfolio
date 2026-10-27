@@ -18,16 +18,22 @@ public interface IContactPipeline
 public sealed class ContactPipeline : IContactPipeline
 {
     private readonly IFormTokenService _tokens;
+    private readonly IContactRateLimiter _rateLimiter;
+    private readonly ITurnstileVerifier _turnstile;
     private readonly IContactSubmitter _submitter;
     private readonly ILogger<ContactPipeline> _logger;
 
     public ContactPipeline(
         IFormTokenService tokens,
+        IContactRateLimiter rateLimiter,
+        ITurnstileVerifier turnstile,
         IContactSubmitter submitter,
         ILogger<ContactPipeline> logger
     )
     {
         _tokens = tokens;
+        _rateLimiter = rateLimiter;
+        _turnstile = turnstile;
         _submitter = submitter;
         _logger = logger;
     }
@@ -76,7 +82,66 @@ public sealed class ContactPipeline : IContactPipeline
             return new ContactSubmitResult(ContactSubmitStatus.InvalidFields, "invalid", validation.FieldErrors);
         }
 
-        return await _submitter.SubmitAsync(validation.Contact!, cancellationToken);
+        ValidatedContact contact = validation.Contact!;
+
+        // Step 7 replaces PassThroughContactRateLimiter. The call stays here,
+        // before siteverify, so a flood of valid-looking posts does not spend
+        // Cloudflare's quota. A non-null result is returned as-is.
+        ContactSubmitResult? limited = await _rateLimiter.AdmitAsync(request, contact, cancellationToken);
+        if (limited is not null)
+        {
+            return limited;
+        }
+
+        if (string.IsNullOrEmpty(contact.TurnstileToken))
+        {
+            return TurnstileField(
+                "turnstile_required",
+                "Complete the check and try again."
+            );
+        }
+
+        if (contact.TurnstileToken.Length > ContactLimits.TurnstileTokenMaxLength)
+        {
+            return TurnstileField(
+                "turnstile_failed",
+                "Complete the check again and try again."
+            );
+        }
+
+        TurnstileVerdict turnstile = await _turnstile.VerifyAsync(
+            contact.TurnstileToken,
+            ClientIp.From(request),
+            cancellationToken
+        );
+        switch (turnstile.Outcome)
+        {
+            case TurnstileOutcome.Passed:
+                break;
+            case TurnstileOutcome.Unavailable:
+                return new ContactSubmitResult(ContactSubmitStatus.TurnstileUnavailable, "turnstile_unavailable");
+            case TurnstileOutcome.Retry:
+                return TurnstileField(
+                    "turnstile_timeout",
+                    "The check expired or was already used. Complete it again and try again."
+                );
+            default:
+                return TurnstileField(
+                    "turnstile_failed",
+                    "Complete the check again and try again."
+                );
+        }
+
+        return await _submitter.SubmitAsync(contact, cancellationToken);
+    }
+
+    private static ContactSubmitResult TurnstileField(string error, string message)
+    {
+        return new ContactSubmitResult(
+            ContactSubmitStatus.TurnstileRejected,
+            error,
+            new Dictionary<string, string> { ["turnstileToken"] = message }
+        );
     }
 
     private static ContactSubmitResult TokenRejection(FormTokenVerdict verdict)

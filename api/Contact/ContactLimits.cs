@@ -22,6 +22,12 @@ public static class ContactLimits
     public const long MaximumAgeMilliseconds = 2 * 60 * 60 * 1000;
     public const long FutureSkewMilliseconds = 30_000;
 
+    /// <summary>Cloudflare's maximum token length. Longer values are rejected without a siteverify call.</summary>
+    public const int TurnstileTokenMaxLength = 2048;
+
+    /// <summary>A Turnstile token is valid for 300 seconds after Cloudflare solves it.</summary>
+    public const long TurnstileMaxAgeMilliseconds = 300_000;
+
     /// <summary>
     /// Shorter keys are treated as missing. A 16-character key is the floor.
     /// Generate a longer one. See api/README.md.

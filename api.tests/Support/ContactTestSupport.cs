@@ -15,14 +15,22 @@ internal static class ContactTestSupport
         string? key,
         TimeProvider time,
         IContactSubmitter submitter,
-        ILogger<ContactPipeline>? logger = null
+        ILogger<ContactPipeline>? logger = null,
+        IContactRateLimiter? rateLimiter = null,
+        ITurnstileVerifier? turnstile = null
     )
     {
         var tokens = new FormTokenService(
             Microsoft.Extensions.Options.Options.Create(new ContactApiOptions { FormTokenKey = key }),
             time
         );
-        return new ContactPipeline(tokens, submitter, logger ?? NullLogger<ContactPipeline>.Instance);
+        return new ContactPipeline(
+            tokens,
+            rateLimiter ?? new PassThroughContactRateLimiter(),
+            turnstile ?? new AcceptingTurnstileVerifier(),
+            submitter,
+            logger ?? NullLogger<ContactPipeline>.Instance
+        );
     }
 
     public static DefaultHttpContext Json(string json, string? contentType = "application/json")
@@ -57,6 +65,50 @@ internal sealed class FixedTimeProvider : TimeProvider
     public DateTimeOffset UtcNow { get; set; }
 
     public override DateTimeOffset GetUtcNow() => UtcNow;
+}
+
+internal sealed class AcceptingTurnstileVerifier : ITurnstileVerifier
+{
+    public int Calls { get; private set; }
+
+    public string? Token { get; private set; }
+
+    public string? RemoteIp { get; private set; }
+
+    public TurnstileVerdict Next { get; set; } = TurnstileVerdict.Passed();
+
+    public Task<TurnstileVerdict> VerifyAsync(
+        string token,
+        string? remoteIp,
+        CancellationToken cancellationToken
+    )
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls++;
+        Token = token;
+        RemoteIp = remoteIp;
+        return Task.FromResult(Next);
+    }
+}
+
+internal sealed class RecordingRateLimiter : IContactRateLimiter
+{
+    public int Calls { get; private set; }
+
+    public ContactSubmitResult? Result { get; set; }
+
+    public ValueTask<ContactSubmitResult?> AdmitAsync(
+        HttpRequest request,
+        ValidatedContact contact,
+        CancellationToken cancellationToken
+    )
+    {
+        _ = request;
+        _ = contact;
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls++;
+        return new ValueTask<ContactSubmitResult?>(Result);
+    }
 }
 
 internal sealed class RecordingSubmitter : IContactSubmitter

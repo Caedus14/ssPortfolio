@@ -5,6 +5,8 @@
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "SQL_CONNECTION_STRING": "",
     "TURNSTILE_SECRET": "",
+    "TURNSTILE_ALLOWED_HOSTS": "",
+    "TURNSTILE_EXPECTED_ACTION": "",
     "IP_HASH_KEY": "",
     "FORM_TOKEN_KEY": ""
   },
