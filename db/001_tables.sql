@@ -1,31 +1,27 @@
-/*
-    001_tables.sql
-    --------------
-    Creates the two tables the contact form will use.
-
-    Run this first, in the Azure portal Query editor, while you are connected
-    to the ssportfolio database (not master). The whole file is one batch.
-    There is no GO. The portal query editor does not understand GO.
-
-    Safe to run again. If the tables already exist, this script leaves them
-    alone. It does not alter columns on a table that already exists.
-*/
+-- 001_tables.sql
+-- --------------
+-- Creates the two tables the contact form will use.
+--
+-- Run this first, in the Azure portal Query editor, while you are connected
+-- to the ssportfolio database (not master). The whole file is one batch.
+-- There is no GO. The portal query editor does not understand GO.
+--
+-- Safe to run again. If the tables already exist, this script leaves them
+-- alone. It does not alter columns on a table that already exists.
 
 IF DB_NAME() = N'master'
     THROW 51002, N'Connect to the ssportfolio database, not master, then run this script again.', 1;
 
-/*
-    ContactMessage is the inbox.
-
-    The API never stores the visitor's IP address. It stores a 32-byte
-    HMAC-SHA256 of a normalized IP string. The HMAC key stays in the API
-    settings, not in this database. IPv6 addresses are grouped by /64
-    before hashing, so one network prefix shares one hash. That grouping
-    happens in the API. This table only stores the finished hash.
-
-    Status and IsFlagged are for a later admin dashboard. The submit
-    procedure always inserts Status = 'new' and IsFlagged = 0.
-*/
+-- ContactMessage is the inbox.
+--
+-- The API never stores the visitor's IP address. It stores a 32-byte
+-- HMAC-SHA256 of a normalized IP string. The HMAC key stays in the API
+-- settings, not in this database. IPv6 addresses are grouped by /64
+-- before hashing, so one network prefix shares one hash. That grouping
+-- happens in the API. This table only stores the finished hash.
+--
+-- Status and IsFlagged are for a later admin dashboard. The submit
+-- procedure always inserts Status = 'new' and IsFlagged = 0.
 IF OBJECT_ID(N'dbo.ContactMessage', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ContactMessage
@@ -58,10 +54,8 @@ BEGIN
     );
 END;
 
-/*
-    Admin screens will list the newest messages, often filtered by status.
-    One index serves both.
-*/
+-- Admin screens will list the newest messages, often filtered by status.
+-- One index serves both.
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes
@@ -73,16 +67,14 @@ BEGIN
         ON dbo.ContactMessage (Status, CreatedUtc DESC);
 END;
 
-/*
-    ContactRateLimitHit is a log of accepted submissions, not of raw IPs.
-    One row is written only when a message is accepted. A rejected attempt
-    does not add a row, so a client who keeps retrying cannot push the
-    window forward forever.
-
-    IpHash + HitAtUtc answers "how many times has this hash called recently?"
-    HitAtUtc alone answers "how many messages has the whole site accepted
-    recently?" and supports the 48-hour cleanup.
-*/
+-- ContactRateLimitHit is a log of accepted submissions, not of raw IPs.
+-- One row is written only when a message is accepted. A rejected attempt
+-- does not add a row, so a client who keeps retrying cannot push the
+-- window forward forever.
+--
+-- IpHash + HitAtUtc answers "how many times has this hash called recently?"
+-- HitAtUtc alone answers "how many messages has the whole site accepted
+-- recently?" and supports the 48-hour cleanup.
 IF OBJECT_ID(N'dbo.ContactRateLimitHit', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ContactRateLimitHit
