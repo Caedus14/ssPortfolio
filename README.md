@@ -1,10 +1,10 @@
 # Seth Stearns — portfolio
 
-Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). The SQL scripts for the contact database are in [`db/`](db/README.md). The contact API skeleton is in [`api/`](api/README.md). The page still does not show a form.
+Personal portfolio and resume site for Seth Stearns, an application developer working in C# / .NET. It is live at [https://sethstearns.dev](https://sethstearns.dev). The SQL scripts for the contact database are in [`db/`](db/README.md). The contact API is in [`api/`](api/README.md). The page still does not show a form.
 
 Later phases can sit beside this without a rewrite:
 
-- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, and a contact route that returns 501. The switch for the form is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
+- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, and contact checks for body size, a honeypot, a signed timer, and field rules. A request that passes those checks still returns 501, and nothing is stored. The switch for the form is `features.contactApi` in `src/config/site.ts`. The contact section is the only place a form should appear.
 - **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
 
 The repository is public. There is no license file, by choice. See [Rights](#rights).
@@ -174,7 +174,7 @@ GitHub Actions CI only checks the code. `.github/workflows/azure-static-web-apps
 
 The workflow builds the site with `npm ci` and `npm run build`, then deploys that `dist` folder with `skip_app_build`. The app location is `dist` itself, not the repo root. `npm ci` creates `node_modules`, and uploading the root would send those files too. Azure then rejects the deploy because the static file count is too high. Oryx still publishes the Functions app from `api/`. `public/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`, which is the Static Web Apps name for the .NET 10 isolated worker.
 
-Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. The contact route does not read them yet.
+Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`, `FORM_TOKEN_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. `FORM_TOKEN_KEY` has to be set before `GET /api/contact/token` will issue a token. The contact route still does not write to SQL.
 
 `public/staticwebapp.config.json` is copied into `dist/` by Vite. It does three jobs:
 

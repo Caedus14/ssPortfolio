@@ -5,7 +5,8 @@
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "SQL_CONNECTION_STRING": "",
     "TURNSTILE_SECRET": "",
-    "IP_HASH_KEY": ""
+    "IP_HASH_KEY": "",
+    "FORM_TOKEN_KEY": ""
   },
   "Host": {
     "LocalHttpPort": 7071,

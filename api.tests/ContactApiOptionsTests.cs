@@ -16,6 +16,7 @@ public sealed class ContactApiOptionsTests
                     ["SQL_CONNECTION_STRING"] = "Server=example;",
                     ["TURNSTILE_SECRET"] = "turnstile-example",
                     ["IP_HASH_KEY"] = "hash-key-example",
+                    ["FORM_TOKEN_KEY"] = "form-token-example",
                 }
             )
             .Build();
@@ -26,5 +27,6 @@ public sealed class ContactApiOptionsTests
         Assert.Equal("Server=example;", options.SqlConnectionString);
         Assert.Equal("turnstile-example", options.TurnstileSecret);
         Assert.Equal("hash-key-example", options.IpHashKey);
+        Assert.Equal("form-token-example", options.FormTokenKey);
     }
 }

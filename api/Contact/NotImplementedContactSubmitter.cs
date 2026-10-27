@@ -1,17 +1,14 @@
 namespace Portfolio.Api.Contact;
 
 /// <summary>
-/// Placeholder. It does not open a SQL connection and it does not read secrets.
+/// Placeholder behind the checks. It does not open a SQL connection and it does not read secrets.
 /// </summary>
 public sealed class NotImplementedContactSubmitter : IContactSubmitter
 {
-    public Task<ContactSubmitResult> SubmitAsync(
-        ContactSubmission submission,
-        CancellationToken cancellationToken
-    )
+    public Task<ContactSubmitResult> SubmitAsync(ValidatedContact contact, CancellationToken cancellationToken)
     {
-        _ = submission;
+        _ = contact;
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new ContactSubmitResult(ContactSubmitStatus.NotImplemented));
+        return Task.FromResult(ContactSubmitResult.NotImplemented());
     }
 }

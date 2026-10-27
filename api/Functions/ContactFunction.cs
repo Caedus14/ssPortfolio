@@ -6,20 +6,17 @@ using Portfolio.Api.Contact;
 namespace Portfolio.Api.Functions;
 
 /// <summary>
-/// POST /api/contact.
-/// This pull request does not read the body. Validation, the honeypot,
-/// the minimum-time check, the origin check, the in-memory rate limit,
-/// Turnstile, and the call to dbo.usp_SubmitContact belong in later changes.
-/// They should go through <see cref="IContactSubmitter" /> so this class
-/// stays the HTTP edge.
+/// POST /api/contact. This class is the HTTP edge. The rules live in
+/// <see cref="ContactPipeline" />, so a test can run each rule without the host.
+/// AuthorizationLevel.Anonymous: the browser does not send a function key.
 /// </summary>
 public sealed class ContactFunction
 {
-    private readonly IContactSubmitter _submitter;
+    private readonly IContactPipeline _pipeline;
 
-    public ContactFunction(IContactSubmitter submitter)
+    public ContactFunction(IContactPipeline pipeline)
     {
-        _submitter = submitter;
+        _pipeline = pipeline;
     }
 
     [Function(nameof(ContactFunction))]
@@ -28,13 +25,7 @@ public sealed class ContactFunction
         CancellationToken cancellationToken
     )
     {
-        // The body stays unread on purpose. Parsing it here would look like
-        // validation, and this skeleton does not validate yet.
-        _ = request;
-        ContactSubmitResult result = await _submitter.SubmitAsync(
-            ContactSubmission.NotParsed,
-            cancellationToken
-        );
+        ContactSubmitResult result = await _pipeline.RunAsync(request, cancellationToken);
         return ContactResponses.From(result);
     }
 }
