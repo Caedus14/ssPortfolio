@@ -54,8 +54,8 @@ public sealed class ContactTokenFunctionTests
             JsonSerializer.Serialize(ContactAcceptedBody.Instance, options)
         );
         Assert.Equal(
-            "{\"error\":\"not_implemented\"}",
-            JsonSerializer.Serialize(new ContactErrorBody("not_implemented"), options)
+            "{\"error\":\"form_token_unavailable\"}",
+            JsonSerializer.Serialize(new ContactErrorBody("form_token_unavailable"), options)
         );
         Assert.Equal(
             "{\"error\":\"invalid\",\"fields\":{\"name\":\"Name must be 1 to 100 characters.\"}}",

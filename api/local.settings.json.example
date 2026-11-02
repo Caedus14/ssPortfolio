@@ -8,7 +8,10 @@
     "TURNSTILE_ALLOWED_HOSTS": "",
     "TURNSTILE_EXPECTED_ACTION": "",
     "IP_HASH_KEY": "",
-    "FORM_TOKEN_KEY": ""
+    "FORM_TOKEN_KEY": "",
+    "CONTACT_MEMORY_PER_MINUTE": "",
+    "CONTACT_MEMORY_PER_HOUR": "",
+    "CONTACT_MEMORY_MAX_ENTRIES": ""
   },
   "Host": {
     "LocalHttpPort": 7071,

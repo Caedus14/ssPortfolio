@@ -2,7 +2,8 @@
  * Phase seams. Phase 1 is a static site and does not call an API.
  *
  * Phase 2 — Azure Functions contact API (api/) + Azure SQL:
- *   POST /api/contact checks the body and Turnstile, then still returns 501.
+ *   POST /api/contact checks the body, Turnstile, and then calls
+ *   dbo.usp_SubmitContact when the API secrets are set.
  *   Set contactApi to true only when a later change adds the real form.
  *   ContactSection is the only UI that should grow a form.
  *   turnstileSiteKey is the public widget key. The secret stays on the API.

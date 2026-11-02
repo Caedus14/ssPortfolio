@@ -37,8 +37,17 @@ public sealed class ContactApiOptions
     /// </summary>
     public string? TurnstileExpectedAction { get; set; }
 
-    /// <summary>HMAC key for IIpAddressHasher. Treat it like a password.</summary>
+    /// <summary>HMAC key for IIpAddressHasher. At least 16 characters. Treat it like a password.</summary>
     public string? IpHashKey { get; set; }
+
+    /// <summary>In-memory attempts per IP hash per minute. Empty or below 1 uses 5.</summary>
+    public int? MemoryIpPerMinute { get; set; }
+
+    /// <summary>In-memory attempts per IP hash per hour. Empty or below 1 uses 20.</summary>
+    public int? MemoryIpPerHour { get; set; }
+
+    /// <summary>Most distinct IP hashes kept in this process. Empty or below 1 uses 4096.</summary>
+    public int? MemoryMaxEntries { get; set; }
 
     /// <summary>
     /// HMAC key for form tokens only. This is a different secret from
@@ -61,5 +70,20 @@ public static class ContactApiOptionsBinder
         options.TurnstileExpectedAction = configuration["TURNSTILE_EXPECTED_ACTION"];
         options.IpHashKey = configuration["IP_HASH_KEY"];
         options.FormTokenKey = configuration["FORM_TOKEN_KEY"];
+        options.MemoryIpPerMinute = ReadOptionalInt(configuration["CONTACT_MEMORY_PER_MINUTE"]);
+        options.MemoryIpPerHour = ReadOptionalInt(configuration["CONTACT_MEMORY_PER_HOUR"]);
+        options.MemoryMaxEntries = ReadOptionalInt(configuration["CONTACT_MEMORY_MAX_ENTRIES"]);
+    }
+
+    private static int? ReadOptionalInt(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        return int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int value)
+            ? value
+            : null;
     }
 }

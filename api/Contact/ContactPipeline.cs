@@ -12,12 +12,14 @@ public interface IContactPipeline
 /// The checks in front of <see cref="IContactSubmitter" />.
 /// Order is cheapest first. A honeypot hit returns before the token check,
 /// so a bot does not learn whether its token was valid.
-/// The submitter runs only after every check has passed. Today that submitter
-/// stores nothing and returns 501.
+/// The submitter runs only after every check has passed, including Turnstile.
+/// A stored message is a 200. The in-memory limit and a missing IP hash key
+/// both stop the request before siteverify.
 /// </summary>
 public sealed class ContactPipeline : IContactPipeline
 {
     private readonly IFormTokenService _tokens;
+    private readonly IIpAddressHasher _hasher;
     private readonly IContactRateLimiter _rateLimiter;
     private readonly ITurnstileVerifier _turnstile;
     private readonly IContactSubmitter _submitter;
@@ -25,6 +27,7 @@ public sealed class ContactPipeline : IContactPipeline
 
     public ContactPipeline(
         IFormTokenService tokens,
+        IIpAddressHasher hasher,
         IContactRateLimiter rateLimiter,
         ITurnstileVerifier turnstile,
         IContactSubmitter submitter,
@@ -32,6 +35,7 @@ public sealed class ContactPipeline : IContactPipeline
     )
     {
         _tokens = tokens;
+        _hasher = hasher;
         _rateLimiter = rateLimiter;
         _turnstile = turnstile;
         _submitter = submitter;
@@ -60,7 +64,7 @@ public sealed class ContactPipeline : IContactPipeline
 
         // The same token stays valid until it expires. A used-token list would
         // need storage shared by every instance, and this plan has none.
-        // Later per-IP and SQL rate limits are what stop a replayed token.
+        // The in-memory window and the SQL rate limits are what stop a replayed token.
         FormTokenVerdict verdict = _tokens.Verify(body.FormToken);
         if (verdict == FormTokenVerdict.Unavailable)
         {
@@ -84,10 +88,23 @@ public sealed class ContactPipeline : IContactPipeline
 
         ValidatedContact contact = validation.Contact!;
 
-        // Step 7 replaces PassThroughContactRateLimiter. The call stays here,
-        // before siteverify, so a flood of valid-looking posts does not spend
-        // Cloudflare's quota. A non-null result is returned as-is.
-        ContactSubmitResult? limited = await _rateLimiter.AdmitAsync(request, contact, cancellationToken);
+        // Hash before the in-memory limit and before siteverify. A missing key
+        // cannot be allowed through, and a request with no visible client IP
+        // still hashes the shared "unknown" label so it cannot skip the limit.
+        string material = IpAddressNormalizer.ForHash(ClientIp.From(request));
+        byte[]? ipHash = _hasher.TryHash(material);
+        if (ipHash is null)
+        {
+            _logger.LogError(
+                "IP_HASH_KEY is missing or shorter than {MinimumLength} characters. Refusing to store the message.",
+                ContactLimits.MinimumIpHashKeyLength
+            );
+            return ContactSubmitResult.ServiceUnavailable(ContactLimits.UnavailableRetryAfterSeconds);
+        }
+
+        // Counts this attempt. A refusal here does not call siteverify.
+        // The window is per instance. SQL is the limit that is shared.
+        ContactSubmitResult? limited = await _rateLimiter.AdmitAsync(ipHash, cancellationToken);
         if (limited is not null)
         {
             return limited;
@@ -132,7 +149,7 @@ public sealed class ContactPipeline : IContactPipeline
                 );
         }
 
-        return await _submitter.SubmitAsync(contact, cancellationToken);
+        return await _submitter.SubmitAsync(contact, ipHash, cancellationToken);
     }
 
     private static ContactSubmitResult TurnstileField(string error, string message)

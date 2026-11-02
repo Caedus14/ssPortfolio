@@ -17,7 +17,8 @@ internal static class ContactTestSupport
         IContactSubmitter submitter,
         ILogger<ContactPipeline>? logger = null,
         IContactRateLimiter? rateLimiter = null,
-        ITurnstileVerifier? turnstile = null
+        ITurnstileVerifier? turnstile = null,
+        IIpAddressHasher? hasher = null
     )
     {
         var tokens = new FormTokenService(
@@ -26,7 +27,13 @@ internal static class ContactTestSupport
         );
         return new ContactPipeline(
             tokens,
-            rateLimiter ?? new PassThroughContactRateLimiter(),
+            hasher ?? new HmacIpAddressHasher(
+                Microsoft.Extensions.Options.Options.Create(new ContactApiOptions { IpHashKey = Key })
+            ),
+            rateLimiter ?? new MemoryContactRateLimiter(
+                Microsoft.Extensions.Options.Options.Create(new ContactApiOptions()),
+                time
+            ),
             turnstile ?? new AcceptingTurnstileVerifier(),
             submitter,
             logger ?? NullLogger<ContactPipeline>.Instance
@@ -97,16 +104,13 @@ internal sealed class RecordingRateLimiter : IContactRateLimiter
 
     public ContactSubmitResult? Result { get; set; }
 
-    public ValueTask<ContactSubmitResult?> AdmitAsync(
-        HttpRequest request,
-        ValidatedContact contact,
-        CancellationToken cancellationToken
-    )
+    public byte[]? Hash { get; private set; }
+
+    public ValueTask<ContactSubmitResult?> AdmitAsync(byte[] ipHash, CancellationToken cancellationToken)
     {
-        _ = request;
-        _ = contact;
         cancellationToken.ThrowIfCancellationRequested();
         Calls++;
+        Hash = ipHash;
         return new ValueTask<ContactSubmitResult?>(Result);
     }
 }
@@ -117,15 +121,19 @@ internal sealed class RecordingSubmitter : IContactSubmitter
 
     public ValidatedContact? Received { get; private set; }
 
+    public byte[]? IpHash { get; private set; }
+
     public Task<ContactSubmitResult> SubmitAsync(
         ValidatedContact contact,
+        byte[] ipHash,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
         Calls++;
         Received = contact;
-        return Task.FromResult(ContactSubmitResult.NotImplemented());
+        IpHash = ipHash;
+        return Task.FromResult(ContactSubmitResult.Accepted());
     }
 }
 
