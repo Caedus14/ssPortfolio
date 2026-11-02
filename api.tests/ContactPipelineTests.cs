@@ -14,7 +14,14 @@ public sealed class ContactPipelineTests
     {
         var submitter = new RecordingSubmitter();
         var logger = new ListLogger<ContactPipeline>();
-        ContactPipeline pipeline = ContactTestSupport.Pipeline(key: null, new FixedTimeProvider(Opened), submitter, logger);
+        var turnstile = new AcceptingTurnstileVerifier();
+        ContactPipeline pipeline = ContactTestSupport.Pipeline(
+            key: null,
+            new FixedTimeProvider(Opened),
+            submitter,
+            logger,
+            turnstile: turnstile
+        );
         DefaultHttpContext context = ContactTestSupport.Json(
             "{\"website\":\"https://spam.example\",\"formToken\":\"forged\",\"email\":\"not-an-email\"}"
         );
@@ -23,6 +30,7 @@ public sealed class ContactPipelineTests
 
         Assert.Equal(ContactSubmitStatus.Accepted, result.Status);
         Assert.Equal(0, submitter.Calls);
+        Assert.Equal(0, turnstile.Calls);
         Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Debug, logger.Entries[0].Level);
         Assert.DoesNotContain("spam.example", logger.Entries[0].Message);
@@ -172,6 +180,90 @@ public sealed class ContactPipelineTests
         Assert.Equal("ts-1", submitter.Received.TurnstileToken);
     }
 
+    [Fact]
+    public async Task A_missing_turnstile_token_is_400_and_does_not_call_siteverify()
+    {
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier();
+        (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile);
+        string json =
+            "{\"name\":\"Seth\",\"email\":\"seth@example.com\",\"message\":\"Hello from the form.\",\"formToken\":\""
+            + token
+            + "\"}";
+
+        ContactSubmitResult result = await pipeline.RunAsync(
+            ContactTestSupport.Json(json).Request,
+            CancellationToken.None
+        );
+
+        Assert.Equal(ContactSubmitStatus.TurnstileRejected, result.Status);
+        Assert.Equal("turnstile_required", result.Error);
+        Assert.Equal("Complete the check and try again.", result.FieldErrors!["turnstileToken"]);
+        Assert.Equal(0, turnstile.Calls);
+        Assert.Equal(0, submitter.Calls);
+    }
+
+    [Fact]
+    public async Task A_spent_turnstile_token_asks_the_person_to_retry()
+    {
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier
+        {
+            Next = new TurnstileVerdict(TurnstileOutcome.Retry, "timeout-or-duplicate"),
+        };
+        (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile);
+
+        ContactSubmitResult result = await pipeline.RunAsync(
+            ContactTestSupport.Json(ContactTestSupport.ValidJson(token)).Request,
+            CancellationToken.None
+        );
+
+        Assert.Equal("turnstile_timeout", result.Error);
+        Assert.Equal(
+            "The check expired or was already used. Complete it again and try again.",
+            result.FieldErrors!["turnstileToken"]
+        );
+        Assert.Equal(1, turnstile.Calls);
+        Assert.Equal(0, submitter.Calls);
+    }
+
+    [Fact]
+    public async Task The_rate_limiter_runs_before_siteverify()
+    {
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier();
+        var limiter = new RecordingRateLimiter
+        {
+            Result = new ContactSubmitResult(ContactSubmitStatus.PayloadTooLarge, "payload_too_large"),
+        };
+        (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile, limiter);
+
+        ContactSubmitResult result = await pipeline.RunAsync(
+            ContactTestSupport.Json(ContactTestSupport.ValidJson(token)).Request,
+            CancellationToken.None
+        );
+
+        Assert.Equal(ContactSubmitStatus.PayloadTooLarge, result.Status);
+        Assert.Equal(1, limiter.Calls);
+        Assert.Equal(0, turnstile.Calls);
+        Assert.Equal(0, submitter.Calls);
+    }
+
+    [Fact]
+    public async Task The_visitor_address_from_the_forwarded_header_is_passed_to_turnstile()
+    {
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier();
+        (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile);
+        DefaultHttpContext context = ContactTestSupport.Json(ContactTestSupport.ValidJson(token));
+        context.Request.Headers["X-Forwarded-For"] = "1.1.1.1, 203.0.113.10, 20.205.82.199";
+
+        await pipeline.RunAsync(context.Request, CancellationToken.None);
+
+        Assert.Equal("203.0.113.10", turnstile.RemoteIp);
+        Assert.Equal("ts-1", turnstile.Token);
+    }
+
     [Theory]
     [InlineData("text/plain", ContactSubmitStatus.UnsupportedMediaType)]
     [InlineData("application/json", ContactSubmitStatus.PayloadTooLarge)]
@@ -197,11 +289,24 @@ public sealed class ContactPipelineTests
         Assert.Equal(0, submitter.Calls);
     }
 
-    private static (ContactPipeline Pipeline, string Token) ReadyPipeline(IContactSubmitter submitter)
+    private static (ContactPipeline Pipeline, string Token) ReadyPipeline(
+        IContactSubmitter submitter,
+        ITurnstileVerifier? turnstile = null,
+        IContactRateLimiter? rateLimiter = null
+    )
     {
         var time = new FixedTimeProvider(Opened);
         Assert.True(FormTokenCodec.TryIssue(ContactTestSupport.Key, Opened, out string token));
         time.UtcNow = Opened.AddSeconds(3);
-        return (ContactTestSupport.Pipeline(ContactTestSupport.Key, time, submitter), token);
+        return (
+            ContactTestSupport.Pipeline(
+                ContactTestSupport.Key,
+                time,
+                submitter,
+                turnstile: turnstile,
+                rateLimiter: rateLimiter
+            ),
+            token
+        );
     }
 }

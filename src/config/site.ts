@@ -2,9 +2,10 @@
  * Phase seams. Phase 1 is a static site and does not call an API.
  *
  * Phase 2 — Azure Functions contact API (api/) + Azure SQL:
- *   The skeleton is deployed, and POST /api/contact is still a 501.
+ *   POST /api/contact checks the body and Turnstile, then still returns 501.
  *   Set contactApi to true only when a later change adds the real form.
  *   ContactSection is the only UI that should grow a form.
+ *   turnstileSiteKey is the public widget key. The secret stays on the API.
  *
  * Phase 3 — admin dashboard:
  *   Add a route in App.tsx. Forms there should edit the types in
@@ -42,7 +43,18 @@ export const features = {
  * `import.meta.env` types. The browser build still injects the variable.
  */
 const viteEnv = import.meta as ImportMeta & {
-  env?: { VITE_CONTACT_API_URL?: string };
+  env?: { VITE_CONTACT_API_URL?: string; VITE_TURNSTILE_SITE_KEY?: string };
 };
 
 export const contactApiUrl = viteEnv.env?.VITE_CONTACT_API_URL ?? '';
+
+/**
+ * Public Cloudflare Turnstile site key for the contact widget.
+ * The secret is TURNSTILE_SECRET on the API and is not in this repository.
+ * An empty VITE_TURNSTILE_SITE_KEY keeps this production key.
+ * The later form renders the widget with action turnstileAction.
+ */
+export const turnstileSiteKey =
+  viteEnv.env?.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAAForbSDVPuig8KiS';
+
+export const turnstileAction = 'contact';

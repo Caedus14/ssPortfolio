@@ -20,6 +20,11 @@ builder.ConfigureFunctionsWebApplication();
 // so /api/health still answers before that setting exists in Azure.
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IFormTokenService, FormTokenService>();
+builder.Services.AddSingleton<IContactRateLimiter, PassThroughContactRateLimiter>();
+builder.Services.AddHttpClient<ITurnstileVerifier, TurnstileVerifier>(client =>
+{
+    client.Timeout = TurnstileVerifier.Timeout;
+});
 builder.Services.AddSingleton<IContactPipeline, ContactPipeline>();
 
 // The hasher and the SQL call are still later steps.

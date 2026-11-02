@@ -5,7 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import * as content from '../data/content.ts';
-import { features, pageUrl } from '../config/site.ts';
+import {
+  features,
+  pageUrl,
+  turnstileAction,
+  turnstileSiteKey,
+} from '../config/site.ts';
 import { renderApp } from './render.tsx';
 
 describe('home page', () => {
@@ -83,5 +88,7 @@ describe('home page', () => {
     expect(document.querySelector('a[href^="tel:"]')).toBeNull();
     expect(serialized).not.toMatch(/telephone|streetAddress|postalCode|"phone"/i);
     expect(features.contactApi).toBe(false);
+    expect(turnstileSiteKey).toBe('0x4AAAAAAForbSDVPuig8KiS');
+    expect(turnstileAction).toBe('contact');
   });
 });
