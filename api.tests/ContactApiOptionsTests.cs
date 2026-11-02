@@ -19,6 +19,9 @@ public sealed class ContactApiOptionsTests
                     ["TURNSTILE_EXPECTED_ACTION"] = "contact",
                     ["IP_HASH_KEY"] = "hash-key-example",
                     ["FORM_TOKEN_KEY"] = "form-token-example",
+                    ["CONTACT_MEMORY_PER_MINUTE"] = "5",
+                    ["CONTACT_MEMORY_PER_HOUR"] = "20",
+                    ["CONTACT_MEMORY_MAX_ENTRIES"] = "100",
                 }
             )
             .Build();
@@ -32,5 +35,8 @@ public sealed class ContactApiOptionsTests
         Assert.Equal("contact", options.TurnstileExpectedAction);
         Assert.Equal("hash-key-example", options.IpHashKey);
         Assert.Equal("form-token-example", options.FormTokenKey);
+        Assert.Equal(5, options.MemoryIpPerMinute);
+        Assert.Equal(20, options.MemoryIpPerHour);
+        Assert.Equal(100, options.MemoryMaxEntries);
     }
 }

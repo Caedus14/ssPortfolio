@@ -28,6 +28,23 @@ public static class ContactLimits
     /// <summary>A Turnstile token is valid for 300 seconds after Cloudflare solves it.</summary>
     public const long TurnstileMaxAgeMilliseconds = 300_000;
 
+    public const int MinimumIpHashKeyLength = 16;
+
+    /// <summary>How long the caller should wait when SQL is waking or the lock is busy and the procedure did not say.</summary>
+    public const int UnavailableRetryAfterSeconds = 15;
+
+    /// <summary>Used when a rate-limit result has no RetryAfterSeconds. One minute is long enough to stop a tight retry loop.</summary>
+    public const int RateLimitFallbackRetryAfterSeconds = 60;
+
+    public const int MemoryDefaultPerMinute = 5;
+    public const int MemoryDefaultPerHour = 20;
+    public const int MemoryDefaultMaxEntries = 4096;
+    public const int MemoryMaxTimestampsPerEntry = 64;
+
+    public const int SqlConnectTimeoutSeconds = 5;
+    public const int SqlCommandTimeoutSeconds = 5;
+    public const long SqlRetryBudgetMilliseconds = 20_000;
+
     /// <summary>
     /// Shorter keys are treated as missing. A 16-character key is the floor.
     /// Generate a longer one. See api/README.md.

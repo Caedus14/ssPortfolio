@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Portfolio.Api.Contact;
+using Portfolio.Api.Options;
 using Xunit;
 
 namespace Portfolio.Api.Tests;
@@ -161,7 +162,7 @@ public sealed class ContactPipelineTests
     }
 
     [Fact]
-    public async Task A_valid_request_reaches_the_submitter_and_returns_501()
+    public async Task A_valid_request_reaches_the_submitter_and_returns_accepted()
     {
         var submitter = new RecordingSubmitter();
         (ContactPipeline pipeline, string token) = ReadyPipeline(submitter);
@@ -171,8 +172,8 @@ public sealed class ContactPipelineTests
             CancellationToken.None
         );
 
-        Assert.Equal(ContactSubmitStatus.NotImplemented, result.Status);
-        Assert.Equal("not_implemented", result.Error);
+        Assert.Equal(ContactSubmitStatus.Accepted, result.Status);
+        Assert.Null(result.Error);
         Assert.Equal(1, submitter.Calls);
         Assert.Equal("Seth", submitter.Received!.Name);
         Assert.Equal("seth@example.com", submitter.Received.Email);
@@ -234,7 +235,7 @@ public sealed class ContactPipelineTests
         var turnstile = new AcceptingTurnstileVerifier();
         var limiter = new RecordingRateLimiter
         {
-            Result = new ContactSubmitResult(ContactSubmitStatus.PayloadTooLarge, "payload_too_large"),
+            Result = ContactSubmitResult.RateLimited(30),
         };
         (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile, limiter);
 
@@ -243,10 +244,75 @@ public sealed class ContactPipelineTests
             CancellationToken.None
         );
 
-        Assert.Equal(ContactSubmitStatus.PayloadTooLarge, result.Status);
+        Assert.Equal(ContactSubmitStatus.RateLimited, result.Status);
+        Assert.Equal("rate_limited", result.Error);
+        Assert.Equal(30, result.RetryAfterSeconds);
         Assert.Equal(1, limiter.Calls);
+        Assert.Equal(32, limiter.Hash!.Length);
         Assert.Equal(0, turnstile.Calls);
         Assert.Equal(0, submitter.Calls);
+    }
+
+    [Fact]
+    public async Task A_missing_ip_hash_key_is_503_and_does_not_call_turnstile()
+    {
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier();
+        var limiter = new RecordingRateLimiter();
+        var hasher = new HmacIpAddressHasher(
+            Microsoft.Extensions.Options.Options.Create(new ContactApiOptions { IpHashKey = "short" })
+        );
+        (ContactPipeline pipeline, string token) = ReadyPipeline(submitter, turnstile, limiter, hasher);
+
+        ContactSubmitResult result = await pipeline.RunAsync(
+            ContactTestSupport.Json(ContactTestSupport.ValidJson(token)).Request,
+            CancellationToken.None
+        );
+
+        Assert.Equal(ContactSubmitStatus.ServiceUnavailable, result.Status);
+        Assert.Equal("unavailable", result.Error);
+        Assert.Equal(ContactLimits.UnavailableRetryAfterSeconds, result.RetryAfterSeconds);
+        Assert.Equal(0, limiter.Calls);
+        Assert.Equal(0, turnstile.Calls);
+        Assert.Equal(0, submitter.Calls);
+    }
+
+    [Fact]
+    public async Task The_memory_limiter_stops_a_second_post_before_siteverify()
+    {
+        var time = new FixedTimeProvider(Opened);
+        Assert.True(FormTokenCodec.TryIssue(ContactTestSupport.Key, Opened, out string token));
+        time.UtcNow = Opened.AddSeconds(3);
+        var submitter = new RecordingSubmitter();
+        var turnstile = new AcceptingTurnstileVerifier();
+        var limiter = new MemoryContactRateLimiter(
+            Microsoft.Extensions.Options.Options.Create(
+                new ContactApiOptions { MemoryIpPerMinute = 1, MemoryIpPerHour = 20 }
+            ),
+            time
+        );
+        ContactPipeline pipeline = ContactTestSupport.Pipeline(
+            ContactTestSupport.Key,
+            time,
+            submitter,
+            rateLimiter: limiter,
+            turnstile: turnstile
+        );
+
+        ContactSubmitResult first = await pipeline.RunAsync(Request(token), CancellationToken.None);
+        ContactSubmitResult second = await pipeline.RunAsync(Request(token), CancellationToken.None);
+
+        Assert.Equal(ContactSubmitStatus.Accepted, first.Status);
+        Assert.Equal(ContactSubmitStatus.RateLimited, second.Status);
+        Assert.Equal(1, turnstile.Calls);
+        Assert.Equal(1, submitter.Calls);
+    }
+
+    private static HttpRequest Request(string token)
+    {
+        DefaultHttpContext context = ContactTestSupport.Json(ContactTestSupport.ValidJson(token));
+        context.Request.Headers["X-Forwarded-For"] = "203.0.113.10";
+        return context.Request;
     }
 
     [Fact]
@@ -292,7 +358,8 @@ public sealed class ContactPipelineTests
     private static (ContactPipeline Pipeline, string Token) ReadyPipeline(
         IContactSubmitter submitter,
         ITurnstileVerifier? turnstile = null,
-        IContactRateLimiter? rateLimiter = null
+        IContactRateLimiter? rateLimiter = null,
+        IIpAddressHasher? hasher = null
     )
     {
         var time = new FixedTimeProvider(Opened);
@@ -304,7 +371,8 @@ public sealed class ContactPipelineTests
                 time,
                 submitter,
                 turnstile: turnstile,
-                rateLimiter: rateLimiter
+                rateLimiter: rateLimiter,
+                hasher: hasher
             ),
             token
         );

@@ -9,7 +9,7 @@ namespace Portfolio.Api.Tests;
 public sealed class ContactFunctionTests
 {
     [Fact]
-    public async Task Post_returns_501_after_the_checks_pass()
+    public async Task Post_returns_200_after_the_checks_pass()
     {
         var time = new FixedTimeProvider(DateTimeOffset.FromUnixTimeMilliseconds(1_700_000_000_000));
         var submitter = new RecordingSubmitter();
@@ -22,12 +22,11 @@ public sealed class ContactFunctionTests
             CancellationToken.None
         );
 
-        ObjectResult body = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(StatusCodes.Status501NotImplemented, body.StatusCode);
-        ContactErrorBody error = Assert.IsType<ContactErrorBody>(body.Value);
-        Assert.Equal("not_implemented", error.Error);
-        Assert.Null(error.Fields);
+        OkObjectResult body = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, body.StatusCode);
+        Assert.Equal(ContactAcceptedBody.Instance, body.Value);
         Assert.Equal(1, submitter.Calls);
+        Assert.Equal(32, submitter.IpHash!.Length);
     }
 
     [Fact]
@@ -51,7 +50,6 @@ public sealed class ContactFunctionTests
     public void Procedure_codes_match_the_database_contract()
     {
         // db/README.md. These are the numbers usp_SubmitContact returns.
-        // HTTP 501 from the placeholder is a different thing and is not in this list.
         Assert.Equal(0, ContactProcedureCodes.Accepted);
         Assert.Equal(1, ContactProcedureCodes.RateLimitedIp);
         Assert.Equal(2, ContactProcedureCodes.RateLimitedGlobal);

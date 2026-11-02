@@ -39,7 +39,6 @@ public sealed record ValidatedContact(string Name, string Email, string Message,
 public enum ContactSubmitStatus
 {
     Accepted,
-    NotImplemented,
     UnsupportedMediaType,
     PayloadTooLarge,
     InvalidJson,
@@ -48,6 +47,8 @@ public enum ContactSubmitStatus
     InvalidFields,
     TurnstileRejected,
     TurnstileUnavailable,
+    RateLimited,
+    ServiceUnavailable,
 }
 
 public enum FormTokenVerdict
@@ -63,16 +64,30 @@ public enum FormTokenVerdict
 public sealed record ContactSubmitResult(
     ContactSubmitStatus Status,
     string? Error = null,
-    IReadOnlyDictionary<string, string>? FieldErrors = null
+    IReadOnlyDictionary<string, string>? FieldErrors = null,
+    int? RetryAfterSeconds = null
 )
 {
     public static ContactSubmitResult Accepted() => new(ContactSubmitStatus.Accepted);
 
-    public static ContactSubmitResult NotImplemented() =>
-        new(ContactSubmitStatus.NotImplemented, "not_implemented");
-
     public static ContactSubmitResult Unavailable() =>
         new(ContactSubmitStatus.FormTokenUnavailable, "form_token_unavailable");
+
+    public static ContactSubmitResult RateLimited(int retryAfterSeconds) =>
+        new(
+            ContactSubmitStatus.RateLimited,
+            "rate_limited",
+            RetryAfterSeconds: AtLeastOne(retryAfterSeconds)
+        );
+
+    public static ContactSubmitResult ServiceUnavailable(int retryAfterSeconds) =>
+        new(
+            ContactSubmitStatus.ServiceUnavailable,
+            "unavailable",
+            RetryAfterSeconds: AtLeastOne(retryAfterSeconds)
+        );
+
+    private static int AtLeastOne(int seconds) => seconds < 1 ? 1 : seconds;
 }
 
 /// <summary>200 body for a honeypot hit, and later for a real accept. Same shape on purpose.</summary>
@@ -85,12 +100,14 @@ public sealed record ContactAcceptedBody(string Status)
 public sealed record ContactErrorBody(
     string Error,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        IReadOnlyDictionary<string, string>? Fields = null
+        IReadOnlyDictionary<string, string>? Fields = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        int? RetryAfterSeconds = null
 );
 
 /// <summary>
 /// Result codes returned by dbo.usp_SubmitContact. See db/README.md.
-/// These are not HTTP status codes. The SQL call that produces them is a later change.
+/// These are not HTTP status codes. ContactProcedureMapper turns them into HTTP.
 /// </summary>
 public static class ContactProcedureCodes
 {
@@ -109,8 +126,6 @@ public static class ContactResponses
         {
             case ContactSubmitStatus.Accepted:
                 return new OkObjectResult(ContactAcceptedBody.Instance);
-            case ContactSubmitStatus.NotImplemented:
-                return Error(StatusCodes.Status501NotImplemented, "not_implemented");
             case ContactSubmitStatus.UnsupportedMediaType:
                 return Error(StatusCodes.Status415UnsupportedMediaType, "unsupported_media_type");
             case ContactSubmitStatus.PayloadTooLarge:
@@ -129,6 +144,18 @@ public static class ContactResponses
                 );
             case ContactSubmitStatus.TurnstileUnavailable:
                 return Error(StatusCodes.Status503ServiceUnavailable, "turnstile_unavailable");
+            case ContactSubmitStatus.RateLimited:
+                return Error(
+                    StatusCodes.Status429TooManyRequests,
+                    "rate_limited",
+                    retryAfterSeconds: result.RetryAfterSeconds
+                );
+            case ContactSubmitStatus.ServiceUnavailable:
+                return Error(
+                    StatusCodes.Status503ServiceUnavailable,
+                    "unavailable",
+                    retryAfterSeconds: result.RetryAfterSeconds
+                );
             default:
                 return Error(StatusCodes.Status500InternalServerError, "error");
         }
@@ -140,9 +167,48 @@ public static class ContactResponses
     private static ObjectResult Error(
         int statusCode,
         string error,
-        IReadOnlyDictionary<string, string>? fields = null
+        IReadOnlyDictionary<string, string>? fields = null,
+        int? retryAfterSeconds = null
     )
     {
+        if (retryAfterSeconds is int)
+        {
+            return new ContactObjectResult(
+                new ContactErrorBody(error, fields, retryAfterSeconds),
+                statusCode,
+                retryAfterSeconds
+            );
+        }
+
         return new ObjectResult(new ContactErrorBody(error, fields)) { StatusCode = statusCode };
+    }
+}
+
+/// <summary>
+/// Sets Retry-After when the result carries a wait. The header is delay-seconds, not a date.
+/// </summary>
+public sealed class ContactObjectResult : ObjectResult
+{
+    public ContactObjectResult(object body, int statusCode, int? retryAfterSeconds)
+        : base(body)
+    {
+        StatusCode = statusCode;
+        RetryAfterSeconds = retryAfterSeconds;
+    }
+
+    public int? RetryAfterSeconds { get; }
+
+    public void ApplyHeaders(HttpResponse response)
+    {
+        if (RetryAfterSeconds is int seconds)
+        {
+            response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public override Task ExecuteResultAsync(ActionContext context)
+    {
+        ApplyHeaders(context.HttpContext.Response);
+        return base.ExecuteResultAsync(context);
     }
 }

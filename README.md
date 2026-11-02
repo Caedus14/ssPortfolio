@@ -4,7 +4,7 @@ Personal portfolio and resume site for Seth Stearns, an application developer wo
 
 Later phases can sit beside this without a rewrite:
 
-- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, contact checks for body size, a honeypot, a signed timer, and field rules, then a Cloudflare Turnstile check. A request that passes those checks still returns 501, and nothing is stored. The public Turnstile site key is `turnstileSiteKey` in `src/config/site.ts`. The switch for the form is `features.contactApi` in that file. The contact section is the only place a form should appear.
+- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, contact checks for body size, a honeypot, a signed timer, and field rules, then an in-memory rate limit, Cloudflare Turnstile, and `dbo.usp_SubmitContact`. A stored message returns 200. The public Turnstile site key is `turnstileSiteKey` in `src/config/site.ts`. The switch for the form is `features.contactApi` in that file. The contact section is the only place a form should appear.
 - **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
 
 The repository is public. There is no license file, by choice. See [Rights](#rights).
@@ -174,7 +174,7 @@ GitHub Actions CI only checks the code. `.github/workflows/azure-static-web-apps
 
 The workflow builds the site with `npm ci` and `npm run build`, then deploys that `dist` folder with `skip_app_build`. The app location is `dist` itself, not the repo root. `npm ci` creates `node_modules`, and uploading the root would send those files too. Azure then rejects the deploy because the static file count is too high. Oryx still publishes the Functions app from `api/`. `public/staticwebapp.config.json` sets `platform.apiRuntime` to `dotnet-isolated:10.0`, which is the Static Web Apps name for the .NET 10 isolated worker.
 
-Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`, `FORM_TOKEN_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. `FORM_TOKEN_KEY` has to be set before `GET /api/contact/token` will issue a token. `TURNSTILE_SECRET` has to be set before a contact post that includes a Turnstile token will get past that check. The contact route still does not write to SQL. The Turnstile site key is public and lives in `src/config/site.ts`.
+Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`, `FORM_TOKEN_KEY`) go in the Static Web App's Environment variables. They do not go in the repo. `FORM_TOKEN_KEY` has to be set before `GET /api/contact/token` will issue a token. `TURNSTILE_SECRET`, `IP_HASH_KEY`, and `SQL_CONNECTION_STRING` have to be set before a contact post is stored. Without them the route fails closed. The Turnstile site key is public and lives in `src/config/site.ts`.
 
 `public/staticwebapp.config.json` is copied into `dist/` by Vite. It does three jobs:
 

@@ -8,10 +8,10 @@ import { Section } from '../Section.tsx';
 const section = sectionById('contact');
 
 /**
- * The contact API is in api/. POST /api/contact checks Turnstile and still
- * returns 501. A form belongs here only after `features.contactApi` in
- * src/config/site.ts is turned on. Until then the only actions are links.
- * There is no phone number.
+ * The contact API is in api/. A post that passes the checks is stored by
+ * dbo.usp_SubmitContact when the API secrets are set. A form belongs here
+ * only after `features.contactApi` in src/config/site.ts is turned on.
+ * Until then the only actions are links. There is no phone number.
  */
 export function ContactSection() {
   return (

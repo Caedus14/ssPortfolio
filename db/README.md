@@ -1,6 +1,6 @@
 # Contact database scripts
 
-These scripts create the Azure SQL objects for the contact form. The API that calls them is a later pull request. Nothing here changes the live React site.
+These scripts create the Azure SQL objects for the contact form. The API in [`api/README.md`](../api/README.md) calls `dbo.usp_SubmitContact`. Nothing here changes the live React site.
 
 The database is the free Azure SQL offer: serverless, auto-pause, server `sethstearns-sql`, database `ssportfolio`.
 
@@ -63,8 +63,9 @@ The first query after the free database auto-pauses can take a minute while the 
 
 The hash is computed in the API, with a secret key that is not stored in SQL:
 
-- IPv4: HMAC of the canonical dotted address, for example `203.0.113.8`.
-- IPv6: group the address by `/64` first, then HMAC the four lowercase hextets of that prefix, for example `2001:db8:abcd:12`.
+- IPv4: HMAC of the canonical dotted address, for example `203.0.113.8`. An IPv4-mapped IPv6 address such as `::ffff:203.0.113.8` is hashed as that same dotted form, so one visitor does not land in two buckets and does not collapse into the all-zero `/64`.
+- IPv6: group the address by `/64` first, then HMAC the four lowercase hextets of that prefix, with leading zeros removed. `2001:0db8:abcd:0012::1` is `2001:db8:abcd:12`.
+- When the API cannot see a client address, it hashes the fixed label `unknown`. Every such request shares that one bucket, so a missing address cannot skip the limit.
 - Send the raw 32-byte HMAC. Do not send a hex string. In the query editor a 32-byte value is written as `0x` plus 64 hex digits.
 
 The hash is not reversible without the key. The key still has to stay secret, because anyone with the key can test an IP address against the stored hashes. The name, email, and message are stored in plain text so you can reply. Treat the database as personal data.

@@ -2,7 +2,7 @@
 
 This folder is the Azure Functions app for the contact form. `GET /api/health` reports that the process is up. `GET /api/contact/token` mints a signed timestamp. `POST /api/contact` runs the cheap spam checks below.
 
-A request that passes every check still returns HTTP 501. Nothing is stored. The in-memory rate limit and the SQL call are later steps. Turnstile is checked. The React site does not show a form yet. `features.contactApi` in `src/config/site.ts` stays `false` until a later change wires the form to this contract. The public site key for that form is `turnstileSiteKey` in the same file.
+A request that passes every check is stored by `dbo.usp_SubmitContact` and returns HTTP 200 `{ "status": "accepted" }`. The same JSON is returned for a honeypot hit, and that hit is not stored. The React site does not show a form yet. `features.contactApi` in `src/config/site.ts` stays `false` until a later change wires the form to this contract. The public site key for that form is `turnstileSiteKey` in the same file.
 
 ## Why it is shaped this way
 
@@ -85,16 +85,19 @@ Checks run in this order. The first failure wins, except field errors, which are
 4. Honeypot.
 5. Form token.
 6. Field rules.
-7. In-memory rate limit. The registered class allows every request. Step 7 replaces that class. The call stays here, before siteverify, so a flood does not spend Cloudflare requests.
-8. Turnstile siteverify.
-9. `IContactSubmitter`. Today that is the 501 placeholder. It does not store the message.
+7. IP hash. `IP_HASH_KEY` must be at least 16 characters. A missing or short key is 503 `unavailable` and siteverify is not called. When no client IP can be named, every such request shares the label `unknown`.
+8. In-memory rate limit, keyed by that hash. Defaults are 5 attempts per minute and 20 per hour. A refusal is 429 and siteverify is not called.
+9. Turnstile siteverify.
+10. `dbo.usp_SubmitContact` through `SQL_CONNECTION_STRING`.
 
 | Status | Body                                                                                                                                          | When                                                                                                                            |
 | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | 415    | `{ "error": "unsupported_media_type" }`                                                                                                       | Content type is missing or is not `application/json`.                                                                           |
 | 413    | `{ "error": "payload_too_large" }`                                                                                                            | Body is larger than 8192 bytes.                                                                                                 |
 | 400    | `{ "error": "invalid_json" }`                                                                                                                 | The body is not a JSON object, a known field is not a string, or the bytes are not UTF-8.                                       |
-| 200    | `{ "status": "accepted" }`                                                                                                                    | `website` is not blank after trim. Same shape a real accept will use later. Nothing is stored.                                  |
+| 200    | `{ "status": "accepted" }`                                                                                                                    | The honeypot was filled, or the procedure stored the message. The JSON is the same. A honeypot is not stored.                   |
+| 429    | `{ "error": "rate_limited", "retryAfterSeconds": N }`                                                                                         | The in-memory window or the procedure's per-IP or global cap. `Retry-After` is the same number of seconds.                      |
+| 503    | `{ "error": "unavailable", "retryAfterSeconds": N }`                                                                                          | `IP_HASH_KEY` or `SQL_CONNECTION_STRING` is missing, the database is still waking after retries, or the procedure is busy.      |
 | 400    | `{ "error": "form_token_required", "fields": { "formToken": "Reload the page and try again." } }`                                             | `formToken` is missing or blank. This does not need the signing key.                                                            |
 | 400    | `{ "error": "form_token_invalid", "fields": { "formToken": "Reload the page and try again." } }`                                              | Tampered, forged, wrong shape, or more than 30 seconds in the future.                                                           |
 | 400    | `{ "error": "form_token_expired", "fields": { "formToken": "This form has been open too long. Reload the page and try again." } }`            | Older than 2 hours.                                                                                                             |
@@ -105,7 +108,6 @@ Checks run in this order. The first failure wins, except field errors, which are
 | 400    | `{ "error": "turnstile_timeout", "fields": { "turnstileToken": "The check expired or was already used. Complete it again and try again." } }` | Cloudflare returned `timeout-or-duplicate`, or `challenge_ts` is older than 300 seconds.                                        |
 | 400    | `{ "error": "turnstile_failed", "fields": { "turnstileToken": "Complete the check again and try again." } }`                                  | The token, hostname, or action was rejected. A token longer than 2048 characters is rejected here too, with no siteverify call. |
 | 503    | `{ "error": "turnstile_unavailable" }`                                                                                                        | `TURNSTILE_SECRET` is missing, Cloudflare rejected the secret, or siteverify could not be completed.                            |
-| 501    | `{ "error": "not_implemented" }`                                                                                                              | Every check passed, including Turnstile. Placeholder until the rate limit and SQL exist.                                        |
 
 `fields` is omitted when the response has no per-field message. There is no `messageId` on the honeypot's 200. Adding one would let a bot tell a trap from a real accept.
 
@@ -145,9 +147,11 @@ The same token can be submitted again until it expires. Remembering used tokens 
 
 If the key is missing, issuing a token and checking a token both return 503. They do not throw, and they do not skip the check. A preview environment without the setting shows this 503. A missing token is still 400, because that decision does not need the key. A honeypot hit is still 200 for the same reason.
 
-**Field rules.** The database procedure already rejects a name, email, or message outside those lengths. Doing it here returns one message per field, which the form can put on the matching input. The link cap and the HTML check are extra. They are the spam that still looks like a valid note. The procedure's result codes stay in `ContactProcedureCodes` for the later SQL step. This step does not call the procedure.
+**Field rules.** The database procedure already rejects a name, email, or message outside those lengths. Doing it here returns one message per field, which the form can put on the matching input. The link cap and the HTML check are extra. They are the spam that still looks like a valid note. The procedure repeats the length checks and can still return `invalid` if they ever disagree. That response is 400 `{ "error": "invalid" }` with no `fields` object.
 
-**Rate limit slot.** `IContactRateLimiter` runs next. `PassThroughContactRateLimiter` allows every request. Step 7 replaces that registration. It stays in front of Turnstile on purpose. Siteverify is a call to Cloudflare, and a flood of otherwise valid posts would burn that quota if the limit ran afterwards. The SQL limits in [`db/README.md`](../db/README.md) still apply when the procedure exists. They are a second layer, after a message is actually stored. An `Origin` check, when it is added, belongs with these cheap checks too.
+**IP hash.** The address from the header rules below is normalized, then HMAC-SHA256'd with `IP_HASH_KEY`. The database stores the raw 32 bytes, never the address. IPv4 is the dotted form (`203.0.113.8`). IPv6 is the `/64` prefix as four lowercase hextets (`2001:db8:abcd:12`). An IPv4-mapped IPv6 address is hashed as IPv4. The format is written out in [`db/README.md`](../db/README.md). A missing or short key is 503 `unavailable` with `Retry-After: 15`. The process does not throw. A request with no client IP hashes the label `unknown`, so those requests share one bucket instead of skipping the limit.
+
+**In-memory rate limit.** This is a sliding window in the current process: 5 attempts per minute and 20 per hour for one hash, overridable with `CONTACT_MEMORY_PER_MINUTE`, `CONTACT_MEMORY_PER_HOUR`, and `CONTACT_MEMORY_MAX_ENTRIES` (default 4096 hashes). Every attempt that reaches this step is counted, including the one that is refused. The map drops hashes that have been idle for an hour, and it drops the least recently seen hash when the cap is full, so a flood cannot grow the dictionary without bound. Each hash keeps at most 64 timestamps. The response is 429 with `Retry-After` and `retryAfterSeconds`. This limit is per instance and it is empty after a cold start. It exists so a burst does not call siteverify. The procedure is the limit that every instance shares.
 
 **Turnstile.** The widget in the browser produces a token. That token is not proof. The server posts it to `https://challenges.cloudflare.com/turnstile/v0/siteverify` with `TURNSTILE_SECRET`, the token, the visitor IP when one can be named safely, and a fresh `idempotency_key` (a UUID). Cloudflare answers with `success`, `hostname`, `action`, and `challenge_ts`.
 
@@ -167,9 +171,9 @@ Allowed hostnames are `sethstearns.dev`, `www.sethstearns.dev`, `nice-rock-033c9
 - On a managed function the chain looks like `visitor, azure-edge`. The rightmost address is the last proxy. The visitor that proxy saw is the address just to its left. A single value is used as-is.
 - `client-ip` on these functions is a private hop inside Azure, not the visitor. It is ignored.
 - `X-Azure-ClientIP`, when the edge sets it, wins. Azure Front Door overwrites that header, so a value the browser sent does not survive. Captures of managed functions often omit it.
-- When none of those yield an address, `remoteip` is left out. The token is still checked. A wrong address would be worse than none.
+- When none of those yield an address, `remoteip` is left out of the siteverify call. The token is still checked. The rate limiter and SQL still run, using the shared `unknown` hash. A wrong address would be worse than none on the Cloudflare call.
 
-The idempotency key lets a retry of the same siteverify call reuse Cloudflare's first answer instead of looking like a spent token. This step does not retry on its own. A second click in the browser is a new call with a new key, so a spent token still fails and the person is asked to complete the check again.
+The idempotency key lets a retry of the same siteverify call reuse Cloudflare's first answer. This step does not retry on its own. A second click in the browser is a new call with a new key, so a spent token still fails.
 
 Failures:
 
@@ -180,7 +184,21 @@ Failures:
 
 Cloudflare's published test secret that always passes returns `hostname: example.com`, a fresh `challenge_ts`, and no `action`, plus `metadata.result_with_testing_key: true`. That one hostname is allowed for a testing-key response, and a missing action is allowed only then. A production secret does not get that exception. `example.com` on a real secret is rejected.
 
-**501.** After Turnstile passes, `NotImplementedContactSubmitter` returns 501 and drops the values. The seam is `IContactSubmitter.SubmitAsync(ValidatedContact)`. The next step that stores anything hashes the client IP and calls `dbo.usp_SubmitContact` with `@Name`, `@Email`, `@Message`, and `@IpHash`.
+**SQL.** After Turnstile passes, `SqlContactSubmitter` calls `dbo.usp_SubmitContact` as a stored procedure with `@Name`, `@Email`, `@Message`, and `@IpHash`. The login is `contact_api`, which can only `EXECUTE` that procedure. The result row is mapped like this:
+
+| `ResultCode`            | HTTP | Body                                                                                           |
+| ----------------------- | ---- | ---------------------------------------------------------------------------------------------- |
+| 0 `accepted`            | 200  | `{ "status": "accepted" }`                                                                     |
+| 1 `rate_limited_ip`     | 429  | `{ "error": "rate_limited", "retryAfterSeconds": N }` from the procedure's `RetryAfterSeconds` |
+| 2 `rate_limited_global` | 429  | the same body, with that procedure value as `Retry-After`                                      |
+| 3 `invalid`             | 400  | `{ "error": "invalid" }`                                                                       |
+| 5 `busy`                | 503  | `{ "error": "unavailable", "retryAfterSeconds": N }`                                           |
+
+A missing connection string is the same 503 with `retryAfterSeconds` 15. So is a SQL error that is not in the wake-up set, and so is giving up after retries.
+
+The free database auto-pauses. The first call then fails with `40613` (or `4060`, `40197`, `40501`, `49918`, `49919`, `49920`) or a connection timeout (`-2`). Those are retried with waits of 250 ms, 1 s, and 2 s. Connect time and command time are each capped at 5 seconds. New attempts stop after 20 seconds, which is under the 45-second function limit. The response the form will show is 503 with `Retry-After: 15`, so the person can try again in a moment. Logs record the SQL error number. They do not record the connection string, the email, or the message.
+
+The accepted JSON has no `messageId`. The honeypot uses that same body, and a message id would let a bot tell them apart. The id is written to the log.
 
 ## Layout
 
@@ -196,7 +214,7 @@ api/
 api.tests/                      xUnit tests. Not deployed.
 ```
 
-`ContactPipeline` is the order of checks. `FormTokenCodec` is the HMAC. `TimeProvider` is the clock, so a test can move time without sleeping. `IIpAddressHasher` is the seam for the IP HMAC. Nothing calls it yet. The database stores 32 bytes of HMAC, never the visitor's IP address.
+`ContactPipeline` is the order of checks. `FormTokenCodec` signs the form token. `HmacIpAddressHasher` is the IP HMAC. `TimeProvider` is the clock, so a test can move time without sleeping. The database stores 32 bytes of HMAC, never the visitor's IP address.
 
 ## How a request moves
 
@@ -218,10 +236,11 @@ api.tests/                      xUnit tests. Not deployed.
 2. The pipeline runs the checks in the contract table.
 3. A honeypot hit returns 200 and `{ "status": "accepted" }`.
 4. Anything else that fails returns the 400, 413, 415, or 503 from that table.
-5. The rate-limit slot runs. Today it allows the request.
-6. Turnstile siteverify runs when `turnstileToken` is present and `TURNSTILE_SECRET` is set. Otherwise the response is the 400 or 503 from the contract table.
-7. A request that passes asks `IContactSubmitter`. The registered class is `NotImplementedContactSubmitter`.
-8. The response is 501 and `{ "error": "not_implemented" }`.
+5. The IP is hashed. A missing `IP_HASH_KEY` returns 503 `unavailable`.
+6. The in-memory rate limit runs. A hit returns 429 and does not call Cloudflare.
+7. Turnstile siteverify runs when `turnstileToken` is present and `TURNSTILE_SECRET` is set. Otherwise the response is the 400 or 503 from the contract table.
+8. A request that passes calls `dbo.usp_SubmitContact`.
+9. The response is 200 `{ "status": "accepted" }` when the procedure stores the row. The other procedure codes are in the table above.
 
 Every function uses `AuthorizationLevel.Anonymous`. A function key would block the browser. Static Web Apps is the front door, and on the Free plan the managed function is not reachable as its own public Function App.
 
@@ -235,20 +254,23 @@ cp api/local.settings.json.example api/local.settings.json
 
 `local.settings.json` is gitignored. The example is safe to commit because every secret is an empty string.
 
-| Name                        | What it is                                                                                                                                   |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FUNCTIONS_WORKER_RUNTIME`  | `dotnet-isolated`. Tells the host which worker to start.                                                                                     |
-| `AzureWebJobsStorage`       | Empty locally. HTTP-only functions do not need a storage account for these routes.                                                           |
-| `SQL_CONNECTION_STRING`     | ADO.NET string for database `ssportfolio` on server `sethstearns-sql`, user `contact_api`. Not read yet.                                     |
-| `TURNSTILE_SECRET`          | Cloudflare Turnstile secret for siteverify. Empty until you set it. The public site key is `turnstileSiteKey` in `src/config/site.ts`.       |
-| `TURNSTILE_ALLOWED_HOSTS`   | Optional comma-separated hostnames added to the built-in allow list. Empty uses only the built-in names.                                     |
-| `TURNSTILE_EXPECTED_ACTION` | Optional. Empty means `contact`.                                                                                                             |
-| `IP_HASH_KEY`               | Secret key for the HMAC of the visitor IP. Anyone with this key can test addresses against the hashes.                                       |
-| `FORM_TOKEN_KEY`            | Secret key for form tokens only. At least 16 characters. Generate about 40. The value is used exactly as stored, including a trailing space. |
+| Name                         | What it is                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FUNCTIONS_WORKER_RUNTIME`   | `dotnet-isolated`. Tells the host which worker to start.                                                                                                |
+| `AzureWebJobsStorage`        | Empty locally. HTTP-only functions do not need a storage account for these routes.                                                                      |
+| `SQL_CONNECTION_STRING`      | ADO.NET string for database `ssportfolio` on server `sethstearns-sql`, user `contact_api`. Empty until you set it. Connect time is capped at 5 seconds. |
+| `TURNSTILE_SECRET`           | Cloudflare Turnstile secret for siteverify. Empty until you set it. The public site key is `turnstileSiteKey` in `src/config/site.ts`.                  |
+| `TURNSTILE_ALLOWED_HOSTS`    | Optional comma-separated hostnames added to the built-in allow list. Empty uses only the built-in names.                                                |
+| `TURNSTILE_EXPECTED_ACTION`  | Optional. Empty means `contact`.                                                                                                                        |
+| `IP_HASH_KEY`                | HMAC key for the visitor IP. At least 16 characters. Anyone with this key can test addresses against the stored hashes.                                 |
+| `FORM_TOKEN_KEY`             | Secret key for form tokens only. At least 16 characters. Generate about 40. The value is used exactly as stored, including a trailing space.            |
+| `CONTACT_MEMORY_PER_MINUTE`  | Optional. Empty uses 5.                                                                                                                                 |
+| `CONTACT_MEMORY_PER_HOUR`    | Optional. Empty uses 20.                                                                                                                                |
+| `CONTACT_MEMORY_MAX_ENTRIES` | Optional. Empty uses 4096.                                                                                                                              |
 
 In Azure, set the secrets under the Static Web App's **Environment variables** (also shown as Configuration / Application settings). Do not put them in `staticwebapp.config.json`. That file is in the repo and is public. The Functions host reads the same names from the environment, which is what `ContactApiOptionsBinder` looks up.
 
-`FORM_TOKEN_KEY` and `TURNSTILE_SECRET` are the settings this API reads today. Add both in the portal when the later deploy step says to. Until `FORM_TOKEN_KEY` is there, `GET /api/contact/token` returns 503, and a POST that includes `formToken` returns 503. Until `TURNSTILE_SECRET` is there, a POST that includes `turnstileToken` and passes the cheap checks returns 503 `turnstile_unavailable`. Health, a honeypot POST, and a POST with no form token keep working. Do not commit a real key. An empty string in the example is the committed value.
+`FORM_TOKEN_KEY`, `TURNSTILE_SECRET`, `IP_HASH_KEY`, and `SQL_CONNECTION_STRING` are the settings this API reads. Add them in the portal when the later deploy step says to. Until `FORM_TOKEN_KEY` is there, `GET /api/contact/token` returns 503, and a POST that includes `formToken` returns 503 `form_token_unavailable`. Until `TURNSTILE_SECRET` is there, a POST that gets past the form token returns 503 `turnstile_unavailable`. Until `IP_HASH_KEY` is there, a POST that gets past the form token returns 503 `unavailable`. On this preview the form-token check runs first, so that is the 503 you will see. Health, a honeypot POST, and a POST with no form token keep working. Do not commit a real key. An empty string in the example is the committed value.
 
 Do not put Cloudflare's always-pass test secret in Azure. It accepts every dummy token. Paste it only into the gitignored `api/local.settings.json` when you want to call siteverify from your machine. The committed example stays empty so a copy of that file into the portal does not open the form.
 
@@ -258,7 +280,7 @@ Generating a password or a hash key:
 python3 -c "import secrets,string; chars=string.ascii_letters+string.digits+'!@#$%^&*-_'; print(''.join(secrets.choice(chars) for _ in range(40)))"
 ```
 
-The SQL user itself is created by `db/003_contact_api_user.sql`. This project does not connect yet.
+The SQL user itself is created by `db/003_contact_api_user.sql`. Put that user's connection string in `SQL_CONNECTION_STRING`. Do not put it in this file.
 
 ## Run it locally
 
@@ -328,4 +350,4 @@ dotnet test ssportfolio.sln
 
 The tests call the function methods in process. They do not start the Functions host and they do not need a real secret. `TimeProvider` is a fixed clock. GitHub Actions runs the same two commands in the "Build and test the API" job, next to the existing frontend job.
 
-Coverage includes the content-type and 8 KiB boundaries, the honeypot's fake 200, tokens that are too fast, expired, tampered, forged, or signed with a short key, link counting, HTML detection, Turnstile's pass, fail, and already-spent shapes against a mocked siteverify call, and the 501 that follows a valid body. The unit tests do not call Cloudflare.
+Coverage includes the content-type and 8 KiB boundaries, the honeypot's fake 200, tokens that are too fast, expired, tampered, forged, or signed with a short key, link counting, HTML detection, Turnstile's pass, fail, and already-spent shapes against a mocked siteverify call, the in-memory window and its eviction cap, the IP hash vectors, every procedure result code, and SQL retries against a fake procedure. The unit tests do not call Cloudflare or Azure SQL. A request that passes the checks returns 200 from the submitter stand-in.
