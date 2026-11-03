@@ -4,7 +4,7 @@ Personal portfolio and resume site for Seth Stearns, an application developer wo
 
 Later phases can sit beside this without a rewrite:
 
-- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, contact checks for body size, a honeypot, a signed timer, and field rules, then an in-memory rate limit, Cloudflare Turnstile, and `dbo.usp_SubmitContact`. A stored message returns 200. The public Turnstile site key is `turnstileSiteKey` in `src/config/site.ts`. The switch for the form is `features.contactApi` in that file. The contact section is the only place a form should appear.
+- **Phase 2** adds the contact API and Azure SQL. The database scripts are in [`db/`](db/README.md). The API project is in [`api/`](api/README.md): .NET 10 isolated Functions, a health check, contact checks for body size, a honeypot, a signed timer, and field rules, then an in-memory rate limit, Cloudflare Turnstile, and `dbo.usp_SubmitContact`. The contact section shows the form because `features.contactApi` is true. Email, LinkedIn, GitHub, and the resume stay on that section. A stored message returns 200. The public Turnstile site key is `turnstileSiteKey` in `src/config/site.ts`.
 - **Phase 3** adds an admin dashboard. It should edit the same shapes in `src/data/types.ts` instead of inventing a second content model.
 
 The repository is public. There is no license file, by choice. See [Rights](#rights).
@@ -184,7 +184,7 @@ Secrets for the API (`SQL_CONNECTION_STRING`, `TURNSTILE_SECRET`, `IP_HASH_KEY`,
 
 `vite build` writes `dist/sitemap.xml` from the project list in `src/data/content.ts`. The file is generated instead of hand-edited, so a new project shows up in the sitemap on the next build. `public/robots.txt` allows every crawler and lists `https://sethstearns.dev/sitemap.xml`.
 
-`VITE_CONTACT_API_URL` is reserved for Phase 2. It is unused while `features.contactApi` is `false`. `VITE_TURNSTILE_SITE_KEY` overrides the public site key in `src/config/site.ts` when you set it. The committed default is the production widget. Copy `.env.example` to `.env` when you need either variable. `.env` is gitignored.
+The contact form posts to `/api` on the same origin. `npm run dev` proxies that to the Functions host on port 7071. `VITE_CONTACT_API_URL` overrides that base when you set it. `VITE_TURNSTILE_SITE_KEY` overrides the public site key in `src/config/site.ts`. The committed default is the production widget `0x4AAAAAAForbSDVPuig8KiS`. For a local widget that always passes, set `VITE_TURNSTILE_SITE_KEY` to Cloudflare's test site key `1x00000000000000000000AA` in `.env` only, and set `TURNSTILE_SECRET` in `api/local.settings.json` to the matching test secret `1x0000000000000000000000000000000AA`. Do not put that test secret in Azure. It accepts every dummy token. Copy `.env.example` to `.env` when you need either variable. `.env` is gitignored.
 
 One tradeoff of the SPA fallback: a path that does not match a project still returns HTTP 200 with the "Page not found" screen. Azure is serving `index.html` on purpose so client-side routes work. A true 404 status would need a Static Web Apps function or a route rule per project slug.
 
