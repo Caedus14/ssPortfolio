@@ -2,10 +2,10 @@
  * Phase seams. Phase 1 is a static site and does not call an API.
  *
  * Phase 2 — Azure Functions contact API (api/) + Azure SQL:
- *   POST /api/contact checks the body, Turnstile, and then calls
- *   dbo.usp_SubmitContact when the API secrets are set.
- *   Set contactApi to true only when a later change adds the real form.
- *   ContactSection is the only UI that should grow a form.
+ *   The contact form is on when contactApi is true. It posts to
+ *   /api/contact. The Azure secrets still have to be set or the post
+ *   fails closed with a message instead of storing anything.
+ *   ContactSection is the only UI that should show the form.
  *   turnstileSiteKey is the public widget key. The secret stays on the API.
  *
  * Phase 3 — admin dashboard:
@@ -35,7 +35,7 @@ export function pageUrl(path: string): string {
 }
 
 export const features = {
-  contactApi: false,
+  contactApi: true,
 } as const;
 
 /**

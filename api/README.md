@@ -2,7 +2,7 @@
 
 This folder is the Azure Functions app for the contact form. `GET /api/health` reports that the process is up. `GET /api/contact/token` mints a signed timestamp. `POST /api/contact` runs the cheap spam checks below.
 
-A request that passes every check is stored by `dbo.usp_SubmitContact` and returns HTTP 200 `{ "status": "accepted" }`. The same JSON is returned for a honeypot hit, and that hit is not stored. The React site does not show a form yet. `features.contactApi` in `src/config/site.ts` stays `false` until a later change wires the form to this contract. The public site key for that form is `turnstileSiteKey` in the same file.
+A request that passes every check is stored by `dbo.usp_SubmitContact` and returns HTTP 200 `{ "status": "accepted" }`. The same JSON is returned for a honeypot hit, and that hit is not stored. The contact section of the site posts here when `features.contactApi` is true. The public site key is `turnstileSiteKey` in `src/config/site.ts`. The widget action is `contact`. The browser field for the widget token is `turnstileToken`.
 
 ## Why it is shaped this way
 
@@ -302,7 +302,7 @@ For Turnstile on your machine, set `TURNSTILE_SECRET` in that same gitignored fi
 1x0000000000000000000000000000000AA
 ```
 
-The matching dummy token is `XXXX.DUMMY.TOKEN.XXXX`. Siteverify then returns success, hostname `example.com`, and no action. This API allows that shape only when Cloudflare marks the response `result_with_testing_key`. The other published test secrets are `2x0000000000000000000000000000000AA` (always fail, `invalid-input-response`) and `3x0000000000000000000000000000000AA` (token already spent, `timeout-or-duplicate`). The published test site keys, for a later local widget, are `1x00000000000000000000AA` (always pass), `2x00000000000000000000AB` (always block), and `3x00000000000000000000FF` (force an interactive challenge). A production secret rejects the dummy token. Leave `TURNSTILE_SECRET` empty to see the 503.
+The matching dummy token is `XXXX.DUMMY.TOKEN.XXXX`. Siteverify then returns success, hostname `example.com`, and no action. This API allows that shape only when Cloudflare marks the response `result_with_testing_key`. The other published test secrets are `2x0000000000000000000000000000000AA` (always fail, `invalid-input-response`) and `3x0000000000000000000000000000000AA` (token already spent, `timeout-or-duplicate`). The published test site keys are `1x00000000000000000000AA` (always pass), `2x00000000000000000000AB` (always block), and `3x00000000000000000000FF` (force an interactive challenge). The form reads `turnstileSiteKey` from `src/config/site.ts`, which is the production key `0x4AAAAAAForbSDVPuig8KiS` unless `VITE_TURNSTILE_SITE_KEY` is set. For a local widget that always passes, put `1x00000000000000000000AA` in `.env` only. A production secret rejects the dummy token. Leave `TURNSTILE_SECRET` empty to see the 503. Do not put the always-pass secret in Azure.
 
 `dotnet run --project api` does the same thing when Core Tools is installed. The SDK starts the Functions host for you.
 
@@ -329,7 +329,7 @@ To click around the site and call the API as the same origin, start the Function
 npm run dev
 ```
 
-Vite proxies `/api` to port 7071, so `http://localhost:5173/api/health` hits the function. That proxy exists only in `npm run dev`. `npm run build` does not include it. Production uses Static Web Apps routing instead.
+Vite proxies `/api` to port 7071, so `http://localhost:5173/api/health` hits the function. The contact form on the home page uses that same proxy. It asks `GET /api/contact/token` when the form is near the viewport, renders Turnstile with action `contact`, and posts `formToken` and `turnstileToken`. There is no Content-Security-Policy header in `staticwebapp.config.json` (the theme script in `index.html` is inline), so nothing there had to be opened for `challenges.cloudflare.com`. That proxy exists only in `npm run dev`. `npm run build` does not include it. Production uses Static Web Apps routing instead.
 
 The [Static Web Apps CLI](https://azure.github.io/static-web-apps-cli/) is the closer match to Azure, because it applies `staticwebapp.config.json` locally. With the Functions host already running and `npm run dev` already running:
 

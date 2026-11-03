@@ -87,7 +87,7 @@ describe('home page', () => {
     expect(text).not.toMatch(/\b(street|avenue|zip code)\b/i);
     expect(document.querySelector('a[href^="tel:"]')).toBeNull();
     expect(serialized).not.toMatch(/telephone|streetAddress|postalCode|"phone"/i);
-    expect(features.contactApi).toBe(false);
+    expect(features.contactApi).toBe(true);
     expect(turnstileSiteKey).toBe('0x4AAAAAAForbSDVPuig8KiS');
     expect(turnstileAction).toBe('contact');
   });

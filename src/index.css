@@ -126,6 +126,19 @@
   }
 }
 
+/*
+  Honeypot. Off-screen, not display:none, so a person and a screen reader
+  skip it (the wrapper is aria-hidden) while a bot that fills every input
+  still submits a value.
+*/
+.contact-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
 /* Programmatic target of the skip link. Parked off-screen until focused. */
 .skip-link {
   position: absolute;
